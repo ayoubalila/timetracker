@@ -20,7 +20,16 @@ jobs:
         with:
           java-version: "21"
           distribution: "temurin"
-          cache: "gradle"
+
+      - name: Cache Gradle wrapper and caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('backend/**/*.gradle*', 'backend/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       - name: Make gradlew executable
         run: chmod +x backend/gradlew
@@ -52,8 +61,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
 
       - name: Install dependencies
         working-directory: frontend
