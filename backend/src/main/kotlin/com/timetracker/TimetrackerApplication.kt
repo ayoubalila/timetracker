@@ -7,5 +7,5 @@ import org.springframework.boot.runApplication
 class TimetrackerApplication
 
 fun main(args: Array<String>) {
-	runApplication<TimetrackerApplication>(*args)
+    runApplication<TimetrackerApplication>(*args)
 }
