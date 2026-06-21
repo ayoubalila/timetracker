@@ -7,7 +7,6 @@ import org.springframework.test.context.ActiveProfiles
 @SpringBootTest
 @ActiveProfiles("test")
 class TimetrackerApplicationTests {
-
     @Test
     fun contextLoads() {
         // Verifies that the Spring application context starts successfully
