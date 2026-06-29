@@ -2,6 +2,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import App from '../App'
 
+function stubFetch(currentStatus = 204) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/current')) {
+        return Promise.resolve({ ok: true, status: currentStatus })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    }),
+  )
+}
+
 describe('App', () => {
   beforeEach(() => {
     localStorage.clear()
@@ -13,36 +25,41 @@ describe('App', () => {
     expect(screen.getByTestId('tab-login')).toBeTruthy()
   })
 
-  it('shows ProjectsPage when valid JWT is in localStorage', () => {
+  it('shows DashboardPage when valid JWT is in localStorage', () => {
     const payload = btoa(JSON.stringify({ sub: 'alice', exp: 9999999999 }))
     localStorage.setItem('tt_token', `header.${payload}.sig`)
-    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})))
+    stubFetch()
 
     render(<App />)
 
     expect(screen.getByTestId('logout-button')).toBeTruthy()
   })
 
-  it('handles malformed JWT gracefully and shows ProjectsPage', () => {
-    // Token exists (so isAuthenticated = true) but is not valid base64 JSON
+  it('handles malformed JWT gracefully and shows DashboardPage', () => {
     localStorage.setItem('tt_token', 'bad.!!!.token')
-    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})))
+    stubFetch()
 
     render(<App />)
 
-    // Still renders ProjectsPage (isAuthenticated is true), username falls back to ''
     expect(screen.getByTestId('logout-button')).toBeTruthy()
   })
 
-  it('transitions to ProjectsPage after successful login', async () => {
+  it('transitions to DashboardPage after successful login', async () => {
     const payload = btoa(JSON.stringify({ sub: 'alice' }))
-    vi.stubGlobal('fetch', vi.fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ token: `h.${payload}.s`, username: 'alice' }),
-      })
-      .mockResolvedValue({ ok: true, status: 200, json: async () => [] }),
+    vi.stubGlobal(
+      'fetch',
+      vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ token: `h.${payload}.s`, username: 'alice' }),
+        })
+        .mockImplementation((url: string) => {
+          if ((url as string).includes('/current')) {
+            return Promise.resolve({ ok: true, status: 204 })
+          }
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+        }),
     )
 
     render(<App />)
@@ -57,11 +74,7 @@ describe('App', () => {
   it('transitions back to LoginPage after logout', async () => {
     const payload = btoa(JSON.stringify({ sub: 'alice', exp: 9999999999 }))
     localStorage.setItem('tt_token', `header.${payload}.sig`)
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => [],
-    }))
+    stubFetch()
 
     render(<App />)
     await waitFor(() => screen.getByTestId('logout-button'))
