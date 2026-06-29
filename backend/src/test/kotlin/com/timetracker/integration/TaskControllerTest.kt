@@ -1,8 +1,8 @@
 package com.timetracker.integration
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.timetracker.dto.CreateTaskRequest
 import com.timetracker.dto.CreateProjectRequest
+import com.timetracker.dto.CreateTaskRequest
 import com.timetracker.dto.RegisterRequest
 import com.timetracker.dto.StartTaskRequest
 import com.timetracker.dto.UpdateTaskRequest
@@ -29,9 +29,13 @@ import java.util.UUID
 @ActiveProfiles("test")
 class TaskControllerTest {
     @Autowired lateinit var mockMvc: MockMvc
+
     @Autowired lateinit var objectMapper: ObjectMapper
+
     @Autowired lateinit var userRepository: UserRepository
+
     @Autowired lateinit var taskRepository: TaskRepository
+
     @Autowired lateinit var projectRepository: ProjectRepository
 
     @BeforeEach
@@ -41,29 +45,46 @@ class TaskControllerTest {
         userRepository.deleteAll()
     }
 
-    private fun registerAndGetToken(username: String = "alice", password: String = "password1"): String {
-        val result = mockMvc.post("/api/auth/register") {
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(RegisterRequest(username, "$username@test.com", password))
-        }.andReturn()
+    private fun registerAndGetToken(
+        username: String = "alice",
+        password: String = "password1",
+    ): String {
+        val result =
+            mockMvc
+                .post("/api/auth/register") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = objectMapper.writeValueAsString(RegisterRequest(username, "$username@test.com", password))
+                }.andReturn()
         return objectMapper.readTree(result.response.contentAsString)["token"].asText()
     }
 
-    private fun startTask(token: String, description: String? = null): UUID {
-        val result = mockMvc.post("/api/tasks/start") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(StartTaskRequest(description = description))
-        }.andExpect { status { isCreated() } }.andReturn()
+    private fun startTask(
+        token: String,
+        description: String? = null,
+    ): UUID {
+        val result =
+            mockMvc
+                .post("/api/tasks/start") {
+                    header("Authorization", "Bearer $token")
+                    contentType = MediaType.APPLICATION_JSON
+                    content = objectMapper.writeValueAsString(StartTaskRequest(description = description))
+                }.andExpect { status { isCreated() } }
+                .andReturn()
         return UUID.fromString(objectMapper.readTree(result.response.contentAsString)["id"].asText())
     }
 
-    private fun createProject(token: String, name: String): UUID {
-        val result = mockMvc.post("/api/projects") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(CreateProjectRequest(name = name))
-        }.andExpect { status { isCreated() } }.andReturn()
+    private fun createProject(
+        token: String,
+        name: String,
+    ): UUID {
+        val result =
+            mockMvc
+                .post("/api/projects") {
+                    header("Authorization", "Bearer $token")
+                    contentType = MediaType.APPLICATION_JSON
+                    content = objectMapper.writeValueAsString(CreateProjectRequest(name = name))
+                }.andExpect { status { isCreated() } }
+                .andReturn()
         return UUID.fromString(objectMapper.readTree(result.response.contentAsString)["id"].asText())
     }
 
@@ -72,12 +93,13 @@ class TaskControllerTest {
     @Test
     fun `GET tasks - 200 returns empty list`() {
         val token = registerAndGetToken()
-        mockMvc.get("/api/tasks") {
-            header("Authorization", "Bearer $token")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$") { isArray() }
-        }
+        mockMvc
+            .get("/api/tasks") {
+                header("Authorization", "Bearer $token")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$") { isArray() }
+            }
     }
 
     @Test
@@ -90,41 +112,44 @@ class TaskControllerTest {
     @Test
     fun `POST tasks_start - 201 creates running task`() {
         val token = registerAndGetToken()
-        mockMvc.post("/api/tasks/start") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(StartTaskRequest(description = "Working"))
-        }.andExpect {
-            status { isCreated() }
-            jsonPath("$.description") { value("Working") }
-            jsonPath("$.endTime") { doesNotExist() }
-            jsonPath("$.startTime") { isNotEmpty() }
-        }
+        mockMvc
+            .post("/api/tasks/start") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(StartTaskRequest(description = "Working"))
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.description") { value("Working") }
+                jsonPath("$.endTime") { doesNotExist() }
+                jsonPath("$.startTime") { isNotEmpty() }
+            }
     }
 
     @Test
     fun `POST tasks_start - 409 when task already running`() {
         val token = registerAndGetToken()
         startTask(token)
-        mockMvc.post("/api/tasks/start") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(StartTaskRequest())
-        }.andExpect { status { isConflict() } }
+        mockMvc
+            .post("/api/tasks/start") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(StartTaskRequest())
+            }.andExpect { status { isConflict() } }
     }
 
     @Test
     fun `POST tasks_start - associates project`() {
         val token = registerAndGetToken()
         val projectId = createProject(token, "Work")
-        mockMvc.post("/api/tasks/start") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(StartTaskRequest(projectIds = listOf(projectId)))
-        }.andExpect {
-            status { isCreated() }
-            jsonPath("$.projectIds[0]") { value(projectId.toString()) }
-        }
+        mockMvc
+            .post("/api/tasks/start") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(StartTaskRequest(projectIds = listOf(projectId)))
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.projectIds[0]") { value(projectId.toString()) }
+            }
     }
 
     // ── current ────────────────────────────────────────────────────────────────
@@ -133,21 +158,23 @@ class TaskControllerTest {
     fun `GET tasks_current - 200 returns running task`() {
         val token = registerAndGetToken()
         val id = startTask(token, "Active")
-        mockMvc.get("/api/tasks/current") {
-            header("Authorization", "Bearer $token")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.id") { value(id.toString()) }
-            jsonPath("$.description") { value("Active") }
-        }
+        mockMvc
+            .get("/api/tasks/current") {
+                header("Authorization", "Bearer $token")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.id") { value(id.toString()) }
+                jsonPath("$.description") { value("Active") }
+            }
     }
 
     @Test
     fun `GET tasks_current - 204 when no task running`() {
         val token = registerAndGetToken()
-        mockMvc.get("/api/tasks/current") {
-            header("Authorization", "Bearer $token")
-        }.andExpect { status { isNoContent() } }
+        mockMvc
+            .get("/api/tasks/current") {
+                header("Authorization", "Bearer $token")
+            }.andExpect { status { isNoContent() } }
     }
 
     // ── stop ───────────────────────────────────────────────────────────────────
@@ -156,12 +183,13 @@ class TaskControllerTest {
     fun `POST tasks_{id}_stop - 200 stops running task`() {
         val token = registerAndGetToken()
         val id = startTask(token)
-        mockMvc.post("/api/tasks/$id/stop") {
-            header("Authorization", "Bearer $token")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.endTime") { isNotEmpty() }
-        }
+        mockMvc
+            .post("/api/tasks/$id/stop") {
+                header("Authorization", "Bearer $token")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.endTime") { isNotEmpty() }
+            }
     }
 
     @Test
@@ -169,9 +197,10 @@ class TaskControllerTest {
         val token = registerAndGetToken()
         val id = startTask(token)
         mockMvc.post("/api/tasks/$id/stop") { header("Authorization", "Bearer $token") }
-        mockMvc.post("/api/tasks/$id/stop") {
-            header("Authorization", "Bearer $token")
-        }.andExpect { status { isBadRequest() } }
+        mockMvc
+            .post("/api/tasks/$id/stop") {
+                header("Authorization", "Bearer $token")
+            }.andExpect { status { isBadRequest() } }
     }
 
     @Test
@@ -179,9 +208,10 @@ class TaskControllerTest {
         val aliceToken = registerAndGetToken("alice")
         val bobToken = registerAndGetToken("bob")
         val id = startTask(aliceToken)
-        mockMvc.post("/api/tasks/$id/stop") {
-            header("Authorization", "Bearer $bobToken")
-        }.andExpect { status { isNotFound() } }
+        mockMvc
+            .post("/api/tasks/$id/stop") {
+                header("Authorization", "Bearer $bobToken")
+            }.andExpect { status { isNotFound() } }
     }
 
     // ── create manual ──────────────────────────────────────────────────────────
@@ -191,17 +221,19 @@ class TaskControllerTest {
         val token = registerAndGetToken()
         val start = Instant.now().minusSeconds(3600)
         val end = Instant.now()
-        mockMvc.post("/api/tasks") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(
-                CreateTaskRequest(description = "Past work", startTime = start, endTime = end),
-            )
-        }.andExpect {
-            status { isCreated() }
-            jsonPath("$.description") { value("Past work") }
-            jsonPath("$.endTime") { isNotEmpty() }
-        }
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(description = "Past work", startTime = start, endTime = end),
+                    )
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.description") { value("Past work") }
+                jsonPath("$.endTime") { isNotEmpty() }
+            }
     }
 
     @Test
@@ -209,13 +241,15 @@ class TaskControllerTest {
         val token = registerAndGetToken()
         val start = Instant.now()
         val end = start.minusSeconds(1)
-        mockMvc.post("/api/tasks") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(
-                CreateTaskRequest(startTime = start, endTime = end),
-            )
-        }.andExpect { status { isBadRequest() } }
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(startTime = start, endTime = end),
+                    )
+            }.andExpect { status { isBadRequest() } }
     }
 
     // ── getById ────────────────────────────────────────────────────────────────
@@ -224,13 +258,14 @@ class TaskControllerTest {
     fun `GET tasks_{id} - 200 returns task`() {
         val token = registerAndGetToken()
         val id = startTask(token, "My task")
-        mockMvc.get("/api/tasks/$id") {
-            header("Authorization", "Bearer $token")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.id") { value(id.toString()) }
-            jsonPath("$.description") { value("My task") }
-        }
+        mockMvc
+            .get("/api/tasks/$id") {
+                header("Authorization", "Bearer $token")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.id") { value(id.toString()) }
+                jsonPath("$.description") { value("My task") }
+            }
     }
 
     @Test
@@ -238,9 +273,10 @@ class TaskControllerTest {
         val aliceToken = registerAndGetToken("alice")
         val bobToken = registerAndGetToken("bob")
         val id = startTask(aliceToken)
-        mockMvc.get("/api/tasks/$id") {
-            header("Authorization", "Bearer $bobToken")
-        }.andExpect { status { isNotFound() } }
+        mockMvc
+            .get("/api/tasks/$id") {
+                header("Authorization", "Bearer $bobToken")
+            }.andExpect { status { isNotFound() } }
     }
 
     // ── update ─────────────────────────────────────────────────────────────────
@@ -251,17 +287,19 @@ class TaskControllerTest {
         val id = startTask(token)
         val newStart = Instant.now().minusSeconds(7200)
         val newEnd = Instant.now().minusSeconds(3600)
-        mockMvc.put("/api/tasks/$id") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(
-                UpdateTaskRequest(description = "Updated", startTime = newStart, endTime = newEnd),
-            )
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.description") { value("Updated") }
-            jsonPath("$.endTime") { isNotEmpty() }
-        }
+        mockMvc
+            .put("/api/tasks/$id") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        UpdateTaskRequest(description = "Updated", startTime = newStart, endTime = newEnd),
+                    )
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.description") { value("Updated") }
+                jsonPath("$.endTime") { isNotEmpty() }
+            }
     }
 
     @Test
@@ -269,13 +307,15 @@ class TaskControllerTest {
         val token = registerAndGetToken()
         val id = startTask(token)
         val start = Instant.now()
-        mockMvc.put("/api/tasks/$id") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(
-                UpdateTaskRequest(startTime = start, endTime = start.minusSeconds(1)),
-            )
-        }.andExpect { status { isBadRequest() } }
+        mockMvc
+            .put("/api/tasks/$id") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        UpdateTaskRequest(startTime = start, endTime = start.minusSeconds(1)),
+                    )
+            }.andExpect { status { isBadRequest() } }
     }
 
     // ── delete ─────────────────────────────────────────────────────────────────
@@ -284,13 +324,15 @@ class TaskControllerTest {
     fun `DELETE tasks_{id} - 204 removes task`() {
         val token = registerAndGetToken()
         val id = startTask(token)
-        mockMvc.delete("/api/tasks/$id") {
-            header("Authorization", "Bearer $token")
-        }.andExpect { status { isNoContent() } }
+        mockMvc
+            .delete("/api/tasks/$id") {
+                header("Authorization", "Bearer $token")
+            }.andExpect { status { isNoContent() } }
 
-        mockMvc.get("/api/tasks/$id") {
-            header("Authorization", "Bearer $token")
-        }.andExpect { status { isNotFound() } }
+        mockMvc
+            .get("/api/tasks/$id") {
+                header("Authorization", "Bearer $token")
+            }.andExpect { status { isNotFound() } }
     }
 
     @Test
@@ -298,8 +340,9 @@ class TaskControllerTest {
         val aliceToken = registerAndGetToken("alice")
         val bobToken = registerAndGetToken("bob")
         val id = startTask(aliceToken)
-        mockMvc.delete("/api/tasks/$id") {
-            header("Authorization", "Bearer $bobToken")
-        }.andExpect { status { isNotFound() } }
+        mockMvc
+            .delete("/api/tasks/$id") {
+                header("Authorization", "Bearer $bobToken")
+            }.andExpect { status { isNotFound() } }
     }
 }

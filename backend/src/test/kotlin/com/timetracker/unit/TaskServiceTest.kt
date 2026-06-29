@@ -34,8 +34,7 @@ class TaskServiceTest {
 
     private fun stubAlice() = whenever(userRepository.findByUsername("alice")).thenReturn(alice)
 
-    private fun task(endTime: Instant? = null) =
-        Task(startTime = now.minusSeconds(60), endTime = endTime, owner = alice)
+    private fun task(endTime: Instant? = null) = Task(startTime = now.minusSeconds(60), endTime = endTime, owner = alice)
 
     // ── listAll ────────────────────────────────────────────────────────────────
 
@@ -109,9 +108,10 @@ class TaskServiceTest {
         stubAlice()
         whenever(taskRepository.existsByOwnerAndEndTimeIsNull(alice)).thenReturn(true)
 
-        val ex = assertThrows<ResponseStatusException> {
-            service.start("alice", StartTaskRequest())
-        }
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.start("alice", StartTaskRequest())
+            }
         assertEquals(409, ex.statusCode.value())
     }
 
@@ -136,9 +136,10 @@ class TaskServiceTest {
         val unknownId = UUID.randomUUID()
         whenever(projectRepository.findByIdAndOwner(unknownId, alice)).thenReturn(null)
 
-        val ex = assertThrows<ResponseStatusException> {
-            service.start("alice", StartTaskRequest(projectIds = listOf(unknownId)))
-        }
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.start("alice", StartTaskRequest(projectIds = listOf(unknownId)))
+            }
         assertEquals(404, ex.statusCode.value())
     }
 
@@ -162,9 +163,10 @@ class TaskServiceTest {
         val t = task(endTime = now)
         whenever(taskRepository.findByIdAndOwner(t.id, alice)).thenReturn(t)
 
-        val ex = assertThrows<ResponseStatusException> {
-            service.stop("alice", t.id)
-        }
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.stop("alice", t.id)
+            }
         assertEquals(400, ex.statusCode.value())
     }
 
@@ -174,9 +176,10 @@ class TaskServiceTest {
         val id = UUID.randomUUID()
         whenever(taskRepository.findByIdAndOwner(id, alice)).thenReturn(null)
 
-        val ex = assertThrows<ResponseStatusException> {
-            service.stop("alice", id)
-        }
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.stop("alice", id)
+            }
         assertEquals(404, ex.statusCode.value())
     }
 
@@ -201,9 +204,10 @@ class TaskServiceTest {
         val start = now
         val end = now.minusSeconds(1)
 
-        val ex = assertThrows<ResponseStatusException> {
-            service.create("alice", CreateTaskRequest(startTime = start, endTime = end))
-        }
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.create("alice", CreateTaskRequest(startTime = start, endTime = end))
+            }
         assertEquals(400, ex.statusCode.value())
     }
 
@@ -226,9 +230,10 @@ class TaskServiceTest {
         val id = UUID.randomUUID()
         whenever(taskRepository.findByIdAndOwner(id, alice)).thenReturn(null)
 
-        val ex = assertThrows<ResponseStatusException> {
-            service.getById("alice", id)
-        }
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.getById("alice", id)
+            }
         assertEquals(404, ex.statusCode.value())
     }
 
@@ -243,11 +248,12 @@ class TaskServiceTest {
 
         val newStart = now.minusSeconds(7200)
         val newEnd = now.minusSeconds(3600)
-        val result = service.update(
-            "alice",
-            t.id,
-            UpdateTaskRequest(description = "Updated", startTime = newStart, endTime = newEnd),
-        )
+        val result =
+            service.update(
+                "alice",
+                t.id,
+                UpdateTaskRequest(description = "Updated", startTime = newStart, endTime = newEnd),
+            )
 
         assertNotNull(result)
     }
@@ -258,13 +264,14 @@ class TaskServiceTest {
         val t = task()
         whenever(taskRepository.findByIdAndOwner(t.id, alice)).thenReturn(t)
 
-        val ex = assertThrows<ResponseStatusException> {
-            service.update(
-                "alice",
-                t.id,
-                UpdateTaskRequest(startTime = now, endTime = now.minusSeconds(1)),
-            )
-        }
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.update(
+                    "alice",
+                    t.id,
+                    UpdateTaskRequest(startTime = now, endTime = now.minusSeconds(1)),
+                )
+            }
         assertEquals(400, ex.statusCode.value())
     }
 
@@ -287,9 +294,10 @@ class TaskServiceTest {
         val id = UUID.randomUUID()
         whenever(taskRepository.findByIdAndOwner(id, alice)).thenReturn(null)
 
-        val ex = assertThrows<ResponseStatusException> {
-            service.delete("alice", id)
-        }
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.delete("alice", id)
+            }
         assertEquals(404, ex.statusCode.value())
     }
 }
