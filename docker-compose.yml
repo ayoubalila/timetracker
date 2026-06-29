@@ -38,5 +38,16 @@ services:
       timeout: 5s
       retries: 10
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+
 volumes:
   postgres_data:
