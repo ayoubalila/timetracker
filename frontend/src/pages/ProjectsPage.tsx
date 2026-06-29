@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ProjectTree } from '../components/ProjectTree'
 import { listProjects, createProject, updateProject, deleteProject } from '../api/projects'
@@ -88,13 +89,19 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b px-6 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">⏱ TimeTracker</h1>
-        <div className="flex items-center gap-4">
+      <header className="bg-white border-b px-6 py-3 flex items-center gap-6">
+        <h1 className="text-lg font-bold">⏱ TimeTracker</h1>
+        <Link to="/dashboard" className="text-gray-600 hover:text-blue-600 text-sm" data-testid="nav-dashboard">
+          Dashboard
+        </Link>
+        <Link to="/projects" className="text-blue-600 font-medium text-sm" data-testid="nav-projects">
+          Projects
+        </Link>
+        <div className="ml-auto flex items-center gap-4">
           <span className="text-sm text-gray-600">{username}</span>
           <button
             onClick={handleLogout}
-            className="text-sm text-gray-600 hover:text-gray-900"
+            className="text-sm text-red-600 hover:underline"
             data-testid="logout-button"
           >
             Logout

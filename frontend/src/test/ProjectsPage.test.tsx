@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { ProjectsPage } from '../pages/ProjectsPage'
 import type { ProjectResponse } from '../types/project'
 
@@ -22,7 +23,9 @@ function setup() {
     renderPage: () =>
       render(
         <QueryClientProvider client={queryClient}>
-          <ProjectsPage username="alice" onLogout={vi.fn()} />
+          <MemoryRouter>
+            <ProjectsPage username="alice" onLogout={vi.fn()} />
+          </MemoryRouter>
         </QueryClientProvider>,
       ),
   }
@@ -187,7 +190,9 @@ describe('ProjectsPage', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <ProjectsPage username="alice" onLogout={onLogout} />
+        <MemoryRouter>
+          <ProjectsPage username="alice" onLogout={onLogout} />
+        </MemoryRouter>
       </QueryClientProvider>,
     )
     await waitFor(() => screen.getByTestId('logout-button'))
