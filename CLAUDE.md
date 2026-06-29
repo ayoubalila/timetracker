@@ -134,6 +134,15 @@ Examples:
 - System tests use a dedicated test database; never run against production data
 - Tests must be deterministic — no `Thread.sleep()`, use `waitForCondition` in Playwright
 
+## Before every git push
+
+Always run these commands before pushing to avoid CI failures:
+
+```bash
+cd backend && ./gradlew ktlintFormat --no-daemon
+cd ../frontend && npm run lint -- --fix
+```
+
 ## What NOT to do
 
 - Never expose entity classes directly in REST responses — always map to DTOs
