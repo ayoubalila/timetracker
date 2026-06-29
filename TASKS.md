@@ -14,8 +14,9 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 | 2 | ~~Set up React + TypeScript + Vite frontend skeleton~~ ✅ #3 / PR #4 | chore | ESLint, Prettier, Vitest, Tailwind, shadcn/ui |
 | 3 | ~~Configure Docker Compose (PostgreSQL + backend)~~ ✅ #5 / PR #6 | chore | dev + prod profiles |
 | 4 | ~~Set up GitHub Actions CI pipeline~~ ✅ #7 / PR #8 | ci | lint, test, coverage gates |
-| 5 | Add `.gitignore` (node_modules, build, target, dist, coverage) | chore | |
-| 6 | Write initial README.md (setup, build, run instructions) | docs | Required by spec §3.4 |
+| 5 | ~~Add `.gitignore` (node_modules, build, target, dist, coverage)~~ ✅ #9 / PR #11 | chore | |
+| 6 | ~~Write initial README.md (setup, build, run instructions)~~ ✅ #10 / PR #11 | docs | Required by spec §3.4 |
+| 6b | ~~Switch CI to self-hosted runner with containerised jobs~~ ✅ #25 / PR #26 | ci | Eclipse Temurin JDK 21 + Node 24 containers |
 
 ---
 
@@ -23,13 +24,13 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 7 | [US] Register a new account | feat | BCrypt hashing, username/email uniqueness validation |
-| 8 | [US] Log in and receive a JWT | feat | Spring Security, jjwt, 401 on invalid credentials |
-| 9 | [US] Log out (client-side token discard) | feat | Frontend clears token from localStorage |
-| 10 | [US] Change password | feat | Verify current password before update |
-| 11 | Secure all non-auth endpoints with JWT filter | feat | `OncePerRequestFilter`, 401 if token missing/invalid |
-| 12 | Unit tests — AuthService (register, login, change password) | test | Mockito, covers happy path + error cases |
-| 13 | Integration tests — AuthController | test | MockMvc + H2 |
+| 7 | ~~[US] Register a new account~~ ✅ #12 / PR #18 | feat | BCrypt hashing, username/email uniqueness validation |
+| 8 | ~~[US] Log in and receive a JWT~~ ✅ #13 / PR #18 | feat | Spring Security, jjwt, 401 on invalid credentials |
+| 9 | ~~[US] Log out (client-side token discard)~~ ✅ #14 / PR #18 | feat | Frontend clears token from localStorage |
+| 10 | ~~[US] Change password~~ ✅ #15 / PR #18 | feat | Verify current password before update |
+| 11 | ~~Secure all non-auth endpoints with JWT filter~~ ✅ #16 / PR #18 | feat | `OncePerRequestFilter`, 401 if token missing/invalid |
+| 12 | ~~Unit tests — AuthService (register, login, change password)~~ ✅ #17 / PR #18 | test | Mockito, covers happy path + error cases |
+| 13 | ~~Integration tests — AuthController~~ ✅ #17 / PR #18 | test | MockMvc + H2 |
 | 14 | E2E test — register → login → logout flow | test | Playwright |
 
 ---
@@ -38,11 +39,11 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 15 | [US] Create, rename, and delete a project | feat | Validate name uniqueness per parent per user |
-| 16 | [US] Organise projects in a hierarchy (subprojects) | feat | Self-referential FK, max depth TBD (suggest 5) |
-| 17 | [US] View project tree in the sidebar | feat | Recursive tree component in React |
-| 18 | Unit tests — ProjectService | test | |
-| 19 | Integration tests — ProjectController | test | |
+| 15 | ~~[US] Create, rename, and delete a project~~ ✅ #19 / PR #24 | feat | Validate name uniqueness per parent per user |
+| 16 | ~~[US] Organise projects in a hierarchy (subprojects)~~ ✅ #20 / PR #24 | feat | Self-referential FK, max depth TBD (suggest 5) |
+| 17 | ~~[US] View project tree in the sidebar~~ ✅ #21 / PR #24 | feat | Recursive tree component in React |
+| 18 | ~~Unit tests — ProjectService~~ ✅ #22 / PR #24 | test | |
+| 19 | ~~Integration tests — ProjectController~~ ✅ #23 / PR #24 | test | |
 | 20 | E2E test — create project → add subproject → view tree | test | Playwright |
 
 ---
@@ -51,14 +52,14 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 21 | [US] Start a task (begin time tracking) | feat | POST /api/tasks/start; enforce one active task per user |
-| 22 | [US] Stop the current running task | feat | POST /api/tasks/{id}/stop; sets endTime = NOW() |
-| 23 | [US] Live timer display while task is running | feat | Frontend polls `/api/tasks/current` every second or uses elapsed time from startTime |
-| 24 | [US] Add a task manually (with explicit start/end time) | feat | Validate endTime > startTime |
-| 25 | [US] Edit a task (description, times, associated projects) | feat | Cannot edit endTime to be before startTime |
-| 26 | [US] Delete a task | feat | |
-| 27 | Unit tests — TaskService | test | |
-| 28 | Integration tests — TaskController | test | |
+| 21 | ~~[US] Start a task (begin time tracking)~~ ✅ #27 / PR #35 | feat | POST /api/tasks/start; enforce one active task per user |
+| 22 | ~~[US] Stop the current running task~~ ✅ #28 / PR #35 | feat | POST /api/tasks/{id}/stop; sets endTime = NOW() |
+| 23 | ~~[US] Live timer display while task is running~~ ✅ #29 / PR #35 | feat | Frontend polls `/api/tasks/current` every second or uses elapsed time from startTime |
+| 24 | ~~[US] Add a task manually (with explicit start/end time)~~ ✅ #30 / PR #35 | feat | Validate endTime > startTime |
+| 25 | ~~[US] Edit a task (description, times, associated projects)~~ ✅ #31 / PR #35 | feat | Cannot edit endTime to be before startTime |
+| 26 | ~~[US] Delete a task~~ ✅ #32 / PR #35 | feat | |
+| 27 | ~~Unit tests — TaskService~~ ✅ #33 / PR #35 | test | |
+| 28 | ~~Integration tests — TaskController~~ ✅ #34 / PR #35 | test | |
 | 29 | E2E test — start task → stop task → edit task | test | Playwright |
 
 ---
