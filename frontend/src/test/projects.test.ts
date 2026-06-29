@@ -22,42 +22,44 @@ function mockFetch(body: unknown, status = 200) {
   )
 }
 
-beforeEach(() => {
-  localStorage.clear()
-  vi.restoreAllMocks()
-})
+describe('projects api', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
 
-it('listProjects returns array', async () => {
-  mockFetch([project])
-  const result = await listProjects()
-  expect(result).toHaveLength(1)
-  expect(result[0].name).toBe('Work')
-})
+  it('listProjects returns array', async () => {
+    mockFetch([project])
+    const result = await listProjects()
+    expect(result).toHaveLength(1)
+    expect(result[0].name).toBe('Work')
+  })
 
-it('getProject returns single project', async () => {
-  mockFetch(project)
-  const result = await getProject('123')
-  expect(result.id).toBe('123')
-})
+  it('getProject returns single project', async () => {
+    mockFetch(project)
+    const result = await getProject('123')
+    expect(result.id).toBe('123')
+  })
 
-it('createProject returns new project', async () => {
-  mockFetch(project, 201)
-  const result = await createProject({ name: 'Work' })
-  expect(result.name).toBe('Work')
-})
+  it('createProject returns new project', async () => {
+    mockFetch(project, 201)
+    const result = await createProject({ name: 'Work' })
+    expect(result.name).toBe('Work')
+  })
 
-it('updateProject returns updated project', async () => {
-  mockFetch({ ...project, name: 'Renamed' })
-  const result = await updateProject('123', { name: 'Renamed' })
-  expect(result.name).toBe('Renamed')
-})
+  it('updateProject returns updated project', async () => {
+    mockFetch({ ...project, name: 'Renamed' })
+    const result = await updateProject('123', { name: 'Renamed' })
+    expect(result.name).toBe('Renamed')
+  })
 
-it('deleteProject resolves for 204', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }))
-  await expect(deleteProject('123')).resolves.toBeUndefined()
-})
+  it('deleteProject resolves for 204', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }))
+    await expect(deleteProject('123')).resolves.toBeUndefined()
+  })
 
-it('createProject throws on 409', async () => {
-  mockFetch('Conflict', 409)
-  await expect(createProject({ name: 'Work' })).rejects.toThrow()
+  it('createProject throws on 409', async () => {
+    mockFetch('Conflict', 409)
+    await expect(createProject({ name: 'Work' })).rejects.toThrow()
+  })
 })
