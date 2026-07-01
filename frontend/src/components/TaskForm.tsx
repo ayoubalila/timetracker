@@ -97,12 +97,15 @@ export function TaskForm({ task, projects, onSave, onCancel, error, isPending }:
         </label>
 
         <label className="block mb-3">
-          <span className="text-sm font-medium text-gray-700">End time (leave empty if still running)</span>
+          <span className="text-sm font-medium text-gray-700">
+            End time{task !== null ? ' (leave empty if still running)' : ''}
+          </span>
           <input
             data-testid="task-end-time"
             type="datetime-local"
             value={endTime}
             onChange={(e) => setEndTime(e.target.value)}
+            required={task === null}
             className="mt-1 block w-full border rounded px-3 py-2 text-sm"
           />
         </label>

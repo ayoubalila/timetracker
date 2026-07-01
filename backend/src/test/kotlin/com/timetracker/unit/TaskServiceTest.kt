@@ -211,6 +211,18 @@ class TaskServiceTest {
         assertEquals(400, ex.statusCode.value())
     }
 
+    @Test
+    fun `create throws 409 when creating running task while one is already active`() {
+        stubAlice()
+        whenever(taskRepository.existsByOwnerAndEndTimeIsNull(alice)).thenReturn(true)
+
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.create("alice", CreateTaskRequest(startTime = now.minusSeconds(60)))
+            }
+        assertEquals(409, ex.statusCode.value())
+    }
+
     // ── getById ────────────────────────────────────────────────────────────────
 
     @Test

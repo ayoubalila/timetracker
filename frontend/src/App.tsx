@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { isAuthenticated, getToken } from './api/client'
@@ -33,6 +33,15 @@ function App() {
     setLoggedIn(false)
     setUsername('')
   }
+
+  useEffect(() => {
+    const onExpired = () => {
+      setLoggedIn(false)
+      setUsername('')
+    }
+    window.addEventListener('auth:expired', onExpired)
+    return () => window.removeEventListener('auth:expired', onExpired)
+  }, [])
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -27,14 +27,22 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   })
   if (!response.ok) {
     const text = await response.text()
-    let message = text || `HTTP ${response.status}`
+    // Start from the status-based fallback so we never leak raw JSON blobs.
+    let message = `HTTP ${response.status}`
     try {
       const json = JSON.parse(text)
+      // Spring Boot includes a human-readable message when include-message=always.
       if (typeof json.message === 'string' && json.message) {
         message = json.message
       }
     } catch {
-      // not JSON — use raw text as-is
+      // Not JSON — use the raw text if the body is non-empty.
+      if (text) message = text
+    }
+    // Expired / invalid JWT: clear the token and let the UI redirect to login.
+    if ((response.status === 401 || response.status === 403) && !path.includes('/api/auth/')) {
+      clearToken()
+      window.dispatchEvent(new Event('auth:expired'))
     }
     throw new ApiError(response.status, message)
   }

@@ -80,6 +80,9 @@ class TaskService(
         if (request.endTime != null && !request.endTime.isAfter(request.startTime)) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "endTime must be after startTime")
         }
+        if (request.endTime == null && taskRepository.existsByOwnerAndEndTimeIsNull(owner)) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "A task is already running")
+        }
         val projects = resolveProjects(request.projectIds, owner)
         val task =
             Task(

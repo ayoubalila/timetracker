@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { changePasswordApi } from '../api/auth'
-import { logoutApi } from '../api/auth'
+import { changePasswordApi, logoutApi } from '../api/auth'
+import { ApiError } from '../api/client'
 
 interface SettingsPageProps {
   username: string
@@ -39,7 +39,11 @@ export function SettingsPage({ username, onLogout }: SettingsPageProps) {
       setNewPassword('')
       setConfirmPassword('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      if (err instanceof ApiError && err.status === 400) {
+        setError('Current password is incorrect')
+      } else {
+        setError(err instanceof Error ? err.message : 'An error occurred')
+      }
     } finally {
       setLoading(false)
     }

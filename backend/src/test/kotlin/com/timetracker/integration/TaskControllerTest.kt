@@ -252,6 +252,21 @@ class TaskControllerTest {
             }.andExpect { status { isBadRequest() } }
     }
 
+    @Test
+    fun `POST tasks - 409 when creating running task while one is active`() {
+        val token = registerAndGetToken()
+        startTask(token)
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(startTime = Instant.now().minusSeconds(60)),
+                    )
+            }.andExpect { status { isConflict() } }
+    }
+
     // ── getById ────────────────────────────────────────────────────────────────
 
     @Test

@@ -4,7 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ProjectTree } from '../components/ProjectTree'
 import { listProjects, createProject, updateProject, deleteProject } from '../api/projects'
 import { logoutApi } from '../api/auth'
+import { ApiError } from '../api/client'
 import type { ProjectResponse } from '../types/project'
+
+function projectErrorMessage(err: Error): string {
+  if (err instanceof ApiError && err.status === 409) {
+    return 'A project with this name already exists at this level'
+  }
+  return err.message
+}
 
 interface ProjectsPageProps {
   username: string
@@ -35,7 +43,7 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
       setNewParentId(null)
       setFormError(null)
     },
-    onError: (err: Error) => setFormError(err.message),
+    onError: (err: Error) => setFormError(projectErrorMessage(err)),
   })
 
   const updateMutation = useMutation({
@@ -46,7 +54,7 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
       setEditingProject(null)
       setFormError(null)
     },
-    onError: (err: Error) => setFormError(err.message),
+    onError: (err: Error) => setFormError(projectErrorMessage(err)),
   })
 
   const deleteMutation = useMutation({
