@@ -1,5 +1,6 @@
 package com.timetracker.config
 
+import jakarta.servlet.http.HttpServletResponse
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -29,6 +30,10 @@ class SecurityConfig(
                     .permitAll()
                     .anyRequest()
                     .authenticated()
+            }.exceptionHandling { ex ->
+                ex.authenticationEntryPoint { _, response, _ ->
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")
+                }
             }.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)
         return http.build()
     }

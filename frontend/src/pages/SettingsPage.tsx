@@ -39,7 +39,7 @@ export function SettingsPage({ username, onLogout }: SettingsPageProps) {
       setNewPassword('')
       setConfirmPassword('')
     } catch (err) {
-      if (err instanceof ApiError && err.status === 400) {
+      if (err instanceof ApiError && (err.status === 400 || err.status === 403)) {
         setError('Current password is incorrect')
       } else {
         setError(err instanceof Error ? err.message : 'An error occurred')

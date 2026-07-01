@@ -103,8 +103,8 @@ class TaskControllerTest {
     }
 
     @Test
-    fun `GET tasks - 403 without token`() {
-        mockMvc.get("/api/tasks").andExpect { status { isForbidden() } }
+    fun `GET tasks - 401 without token`() {
+        mockMvc.get("/api/tasks").andExpect { status { isUnauthorized() } }
     }
 
     // ── start ──────────────────────────────────────────────────────────────────

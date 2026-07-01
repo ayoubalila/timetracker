@@ -122,12 +122,12 @@ class ProjectControllerTest {
     }
 
     @Test
-    fun `POST projects - 403 without token`() {
+    fun `POST projects - 401 without token`() {
         mockMvc
             .post("/api/projects") {
                 contentType = MediaType.APPLICATION_JSON
                 content = objectMapper.writeValueAsString(CreateProjectRequest(name = "Work"))
-            }.andExpect { status { isForbidden() } }
+            }.andExpect { status { isUnauthorized() } }
     }
 
     @Test

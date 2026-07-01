@@ -39,8 +39,8 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
       // Not JSON — use the raw text if the body is non-empty.
       if (text) message = text
     }
-    // Expired / invalid JWT: clear the token and let the UI redirect to login.
-    if ((response.status === 401 || response.status === 403) && !path.includes('/api/auth/')) {
+    // Expired / invalid JWT: Spring Security returns 401 via our custom AuthenticationEntryPoint.
+    if (response.status === 401 && !path.includes('/api/auth/')) {
       clearToken()
       window.dispatchEvent(new Event('auth:expired'))
     }

@@ -157,9 +157,9 @@ class AuthControllerTest {
     }
 
     @Test
-    fun `protected endpoint - 403 without token`() {
+    fun `protected endpoint - 401 without token`() {
         mockMvc
             .post("/api/auth/logout")
-            .andExpect { status { isForbidden() } }
+            .andExpect { status { isUnauthorized() } }
     }
 }
