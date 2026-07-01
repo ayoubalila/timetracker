@@ -400,4 +400,40 @@ describe('DashboardPage', () => {
     const item = screen.getByTestId('task-item-long-1')
     expect(item.textContent).toMatch(/1h/)
   })
+
+  it('shows loading state while current task is being fetched', () => {
+    renderDashboard(() => new Promise(() => {}))
+    expect(screen.getByTestId('current-task-loading')).toBeTruthy()
+  })
+
+  it('shows friendly error and refetches when start returns 409', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if ((url as string).includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      if ((url as string).includes('/start') && (opts as RequestInit)?.method === 'POST') {
+        return Promise.resolve({
+          ok: false,
+          status: 409,
+          text: async () => 'A task is already running',
+        })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <DashboardPage username="alice" onLogout={vi.fn()} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => screen.getByTestId('start-task-button'))
+    fireEvent.click(screen.getByTestId('start-task-button'))
+    fireEvent.submit(screen.getByTestId('start-form'))
+
+    await waitFor(() => expect(screen.getByTestId('start-error')).toBeTruthy())
+    expect(screen.getByTestId('start-error').textContent).toContain('already running')
+  })
 })

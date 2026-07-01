@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { loginApi, registerApi } from '../api/auth'
+import { ApiError } from '../api/client'
 
 interface LoginPageProps {
   onLogin: (username: string) => void
@@ -26,7 +27,11 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         onLogin(data.username)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        setError('Wrong username or password')
+      } else {
+        setError(err instanceof Error ? err.message : 'An error occurred')
+      }
     } finally {
       setLoading(false)
     }

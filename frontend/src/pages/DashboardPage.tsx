@@ -6,6 +6,7 @@ import { TaskForm } from '../components/TaskForm'
 import { getCurrentTask, listTasks, startTask, stopTask, createTask, updateTask, deleteTask } from '../api/tasks'
 import { listProjects } from '../api/projects'
 import { logoutApi } from '../api/auth'
+import { ApiError } from '../api/client'
 import type { TaskResponse } from '../types/task'
 
 interface DashboardPageProps {
@@ -34,7 +35,7 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
   const [startDescription, setStartDescription] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
-  const { data: currentTaskData } = useQuery({
+  const { data: currentTaskData, isLoading: currentTaskLoading } = useQuery({
     queryKey: ['current-task'],
     queryFn: getCurrentTask,
   })
@@ -61,7 +62,14 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
       setStartDescription('')
       setFormError(null)
     },
-    onError: (err: Error) => setFormError(err.message),
+    onError: (err: Error) => {
+      if (err instanceof ApiError && err.status === 409) {
+        setFormError('A task is already running. Stop it before starting a new one.')
+        queryClient.invalidateQueries({ queryKey: ['current-task'] })
+      } else {
+        setFormError(err.message)
+      }
+    },
   })
 
   const stopMutation = useMutation({
@@ -133,6 +141,9 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
         <Link to="/projects" className="text-gray-600 hover:text-blue-600 text-sm" data-testid="nav-projects">
           Projects
         </Link>
+        <Link to="/settings" className="text-gray-600 hover:text-blue-600 text-sm" data-testid="nav-settings">
+          Settings
+        </Link>
         <div className="ml-auto flex items-center gap-4">
           <span className="text-sm text-gray-600">{username}</span>
           <button
@@ -151,7 +162,11 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
           <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
             Current Task
           </h2>
-          {currentTask ? (
+          {currentTaskLoading ? (
+            <div className="bg-white border rounded-lg p-4">
+              <p className="text-sm text-gray-400" data-testid="current-task-loading">Loading…</p>
+            </div>
+          ) : currentTask ? (
             <div
               data-testid="current-task-panel"
               className="bg-white border rounded-lg p-4 flex items-center gap-4"
@@ -177,32 +192,34 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
           ) : (
             <div className="bg-white border rounded-lg p-4">
               {showStartForm ? (
-                <form data-testid="start-form" onSubmit={handleStart} className="flex gap-2">
-                  <input
-                    data-testid="start-description"
-                    type="text"
-                    value={startDescription}
-                    onChange={(e) => setStartDescription(e.target.value)}
-                    placeholder="What are you working on?"
-                    className="flex-1 border rounded px-3 py-1.5 text-sm"
-                    autoFocus
-                  />
-                  <button
-                    type="submit"
-                    data-testid="start-submit"
-                    disabled={startMutation.isPending}
-                    className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                  >
-                    Start
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="start-cancel"
-                    onClick={() => setShowStartForm(false)}
-                    className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
+                <form data-testid="start-form" onSubmit={handleStart} className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      data-testid="start-description"
+                      type="text"
+                      value={startDescription}
+                      onChange={(e) => setStartDescription(e.target.value)}
+                      placeholder="What are you working on?"
+                      className="flex-1 border rounded px-3 py-1.5 text-sm"
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      data-testid="start-submit"
+                      disabled={startMutation.isPending}
+                      className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                    >
+                      Start
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="start-cancel"
+                      onClick={() => { setShowStartForm(false); setFormError(null) }}
+                      className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                   {formError && (
                     <p data-testid="start-error" className="text-red-600 text-sm">{formError}</p>
                   )}

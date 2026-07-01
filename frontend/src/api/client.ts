@@ -5,6 +5,16 @@ export const setToken = (token: string): void => localStorage.setItem(TOKEN_KEY,
 export const clearToken = (): void => localStorage.removeItem(TOKEN_KEY)
 export const isAuthenticated = (): boolean => getToken() !== null
 
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken()
   const response = await fetch(path, {
@@ -17,7 +27,16 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   })
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(text || `HTTP ${response.status}`)
+    let message = text || `HTTP ${response.status}`
+    try {
+      const json = JSON.parse(text)
+      if (typeof json.message === 'string' && json.message) {
+        message = json.message
+      }
+    } catch {
+      // not JSON — use raw text as-is
+    }
+    throw new ApiError(response.status, message)
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>

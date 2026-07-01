@@ -5,6 +5,10 @@ export interface AuthResponse {
   username: string
 }
 
+export interface MessageResponse {
+  message: string
+}
+
 export async function loginApi(username: string, password: string): Promise<AuthResponse> {
   const data = await apiRequest<AuthResponse>('/api/auth/login', {
     method: 'POST',
@@ -25,6 +29,16 @@ export async function registerApi(
   })
   setToken(data.token)
   return data
+}
+
+export async function changePasswordApi(
+  currentPassword: string,
+  newPassword: string,
+): Promise<MessageResponse> {
+  return apiRequest<MessageResponse>('/api/auth/password', {
+    method: 'PUT',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
 }
 
 export async function logoutApi(): Promise<void> {

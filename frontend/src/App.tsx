@@ -5,6 +5,7 @@ import { isAuthenticated, getToken } from './api/client'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ProjectsPage } from './pages/ProjectsPage'
+import { SettingsPage } from './pages/SettingsPage'
 
 const queryClient = new QueryClient()
 
@@ -64,6 +65,16 @@ function App() {
                 <Navigate to="/login" replace />
               ) : (
                 <ProjectsPage username={username} onLogout={handleLogout} />
+              )
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              !loggedIn ? (
+                <Navigate to="/login" replace />
+              ) : (
+                <SettingsPage username={username} onLogout={handleLogout} />
               )
             }
           />

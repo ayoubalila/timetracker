@@ -97,6 +97,9 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
         <Link to="/projects" className="text-blue-600 font-medium text-sm" data-testid="nav-projects">
           Projects
         </Link>
+        <Link to="/settings" className="text-gray-600 hover:text-blue-600 text-sm" data-testid="nav-settings">
+          Settings
+        </Link>
         <div className="ml-auto flex items-center gap-4">
           <span className="text-sm text-gray-600">{username}</span>
           <button
