@@ -106,24 +106,72 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 ---
 
-## Milestone 7 — Part II requirements (Week 4–5: Jun 29–Jul 15)
-
-Requirements update arrives **2026-06-29**. Leave capacity here; tasks will be created after reading the update.
+## Milestone 7A — Project sharing (Week 4: Jul 6–9)
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 49+ | TBD — Part II features | feat | Created after 2026-06-29 |
+| 49 | Flyway V5 — `project_member` table | chore | Columns: `project_id` FK, `user_id` FK, `role` VARCHAR(20); UNIQUE (project_id, user_id) |
+| 50 | [US] Invite a registered user to a project | feat | `POST /api/projects/{id}/members`; owner-only; 404 if username not found; 409 if already member |
+| 51 | [US] View and remove project members | feat | `GET /api/projects/{id}/members`; `DELETE /api/projects/{id}/members/{userId}`; owner-only remove |
+| 52 | [US] Shared project appears in invitee's project list | feat | `ProjectService.getAll()` returns owned + member projects; read-only unless owner |
+| 53 | [US] Project members can add tasks to a shared project | feat | Membership check (owner OR member) in task creation; scoped by project access not user ownership |
+| 54 | Unit tests — ProjectService sharing | test | Cover invite, remove, access check, non-member rejection |
+| 55 | Integration tests — ProjectController sharing | test | MockMvc, H2; include auth for both owner and member tokens |
 
 ---
 
-## Milestone 8 — Final submission prep (Week 5: Jul 13–19)
+## Milestone 7B — Shared project task overview (Week 4: Jul 9–11)
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 50 | Full end-to-end smoke test on clean Docker environment | test | Follow README from scratch on a clean machine |
-| 51 | Write project report (`report/report.md`) | docs | See spec §3.2 for required sections |
-| 52 | Final README review (all setup steps accurate?) | docs | |
-| 53 | Ensure all open issues are closed or explicitly deferred | chore | |
+| 56 | [US] Project task list shows all members' tasks | feat | `GET /api/projects/{id}/tasks` returns tasks from all participating users |
+| 57 | [US] Filter project task list by user | feat | `?userId=` query param on project tasks endpoint; member-only access |
+| 58 | [US] Per-user time breakdown on project detail | feat | Frontend renders time totals per user alongside project total |
+| 59 | Unit + integration tests — shared task overview | test | |
+
+---
+
+## Milestone 7C — Export (Week 4: Jul 10–12)
+
+| # | Issue title | Type | Notes |
+|---|-------------|------|-------|
+| 60 | [US] Export project tasks for a specific month as CSV | feat | `GET /api/projects/{id}/export?month=2026-07`; includes subproject tasks |
+| 61 | [US] Export all project tasks (no date filter) | feat | Same endpoint without `month` param; streaming for large datasets |
+| 62 | Export format: CSV columns | feat | Columns: `username`, `project_path`, `description`, `start_time`, `end_time`, `duration_seconds` |
+| 63 | Unit + integration tests — export endpoint | test | Verify CSV structure, month filtering, subproject inclusion |
+
+---
+
+## Milestone 7D — Time zones (Week 4: Jul 12–13)
+
+| # | Issue title | Type | Notes |
+|---|-------------|------|-------|
+| 64 | Flyway V6 — `timezone` column on `users` table | chore | `VARCHAR(50) NOT NULL DEFAULT 'UTC'`; IANA tz string (e.g. `Europe/Berlin`) |
+| 65 | [US] Set preferred time zone in account settings | feat | `PUT /api/auth/timezone`; validate against IANA tz database; persisted in DB |
+| 66 | [US] New tasks default to my time zone | feat | Frontend pre-fills task start time using user's stored tz; backend stores UTC |
+| 67 | [US] Shared project timestamps shown in my time zone | feat | Frontend converts all UTC timestamps to user's preferred tz for display |
+| 68 | Unit + integration tests — timezone setting | test | |
+
+---
+
+## Milestone 7E — Custom features (Week 4–5: Jul 13–16)
+
+| # | Issue title | Type | Notes |
+|---|-------------|------|-------|
+| 69 | [US] Custom feature 1 — TBD | feat | Must have user benefit; define before implementing (candidates: time budgets, tags/labels, team dashboard) |
+| 70 | [US] Custom feature 2 — TBD | feat | Required for Master's students |
+| 71 | [US] Custom feature 3 — TBD | feat | Required for Master's students |
+
+---
+
+## Milestone 8 — Final submission prep (Week 5: Jul 16–19)
+
+| # | Issue title | Type | Notes |
+|---|-------------|------|-------|
+| 72 | Full end-to-end smoke test on clean Docker environment | test | Clone repo fresh, follow README, verify all features end-to-end |
+| 73 | Write project report (`report/report.md`) | docs | Include custom features section per Part 2 §3; link issues + PRs |
+| 74 | Final README review (all setup steps accurate?) | docs | |
+| 75 | Ensure all open issues are closed or explicitly deferred | chore | |
 
 ---
 
@@ -157,12 +205,29 @@ As a [role], I want [goal], so that [benefit].
 
 ## Priority order summary
 
-1. Milestone 0 (scaffolding + CI) — nothing else works without this
-2. Milestone 1 (auth) — all features require authenticated users
-3. Milestone 2 (projects) — tasks need projects to be associated with
-4. Milestone 3 (time tracking) — core feature, most complex
+1. Milestone 0 (scaffolding + CI) — nothing else works without this ✅
+2. Milestone 1 (auth) — all features require authenticated users ✅
+3. Milestone 2 (projects) — tasks need projects to be associated with ✅
+4. Milestone 3 (time tracking) — core feature, most complex ✅
 5. Milestone 4 (overview) — depends on tracked data existing
 6. Milestone 5 (persistence verification) — confirm invariants
-7. Milestone 6 (polish + coverage) — quality gate
-8. Milestone 7 (Part II) — unknown, leave buffer
-9. Milestone 8 (submission) — always last
+7. Milestone 7A (project sharing) — Part II mandatory; new entity + security model
+8. Milestone 7B (shared task overview) — depends on sharing
+9. Milestone 7C (export) — depends on shared project task data
+10. Milestone 7D (time zones) — depends on user settings infrastructure
+11. Milestone 7E (custom features) — Master's requirement
+12. Milestone 6 (polish + coverage) — quality gate; do last before submission
+13. Milestone 8 (submission) — always last
+
+## Remaining timeline (today: 2026-07-01 | deadline: 2026-07-19)
+
+| Week | Dates | Focus |
+|------|-------|-------|
+| Week 3 | Jul 1–5 | M4 Task overview + time aggregation; M5 persistence verification |
+| Week 4a | Jul 6–9 | M7A Project sharing (backend + frontend) |
+| Week 4b | Jul 9–11 | M7B Shared task overview (all users + filter) |
+| Week 4c | Jul 10–12 | M7C Export (CSV endpoint + frontend download) |
+| Week 4d | Jul 12–13 | M7D Time zones (DB + settings + display) |
+| Week 5a | Jul 13–16 | M7E Custom features (3 for Master's) |
+| Week 5b | Jul 14–16 | M6 Coverage hardening + input validation |
+| Week 5c | Jul 16–19 | M8 Smoke test + report + final submission |

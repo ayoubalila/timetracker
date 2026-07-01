@@ -124,16 +124,18 @@ WHERE t.owner_id = :userId;
 
 ## 4. REST API surface
 
+### Part I endpoints (implemented)
+
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/api/auth/register` | Create account |
 | POST | `/api/auth/login` | Return JWT |
 | PUT | `/api/auth/password` | Change password (auth required) |
-| GET | `/api/projects` | List user's top-level projects |
+| GET | `/api/projects` | List projects (owned + member) |
 | POST | `/api/projects` | Create project |
 | GET | `/api/projects/{id}` | Get project + subprojects + total time |
-| PUT | `/api/projects/{id}` | Update project |
-| DELETE | `/api/projects/{id}` | Delete project |
+| PUT | `/api/projects/{id}` | Update project (owner only) |
+| DELETE | `/api/projects/{id}` | Delete project (owner only) |
 | GET | `/api/tasks` | List tasks (query params: date range, projectId) |
 | POST | `/api/tasks` | Create task (manual) |
 | POST | `/api/tasks/start` | Start a new running task |
@@ -145,6 +147,17 @@ WHERE t.owner_id = :userId;
 | GET | `/api/overview/day` | Tasks for today |
 | GET | `/api/overview/week` | Tasks for current week |
 | GET | `/api/overview/month` | Tasks for current month |
+
+### Part II new endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/projects/{id}/members` | List members of a project (owner + members can view) |
+| POST | `/api/projects/{id}/members` | Invite a user by username (owner only) |
+| DELETE | `/api/projects/{id}/members/{userId}` | Remove a member (owner only) |
+| GET | `/api/projects/{id}/tasks` | List all tasks for a project across all members; `?userId=` filter |
+| GET | `/api/projects/{id}/export` | Export tasks as CSV; `?month=YYYY-MM` for monthly slice, omit for all |
+| PUT | `/api/auth/timezone` | Set the authenticated user's preferred timezone (IANA string) |
 
 ---
 
@@ -244,18 +257,115 @@ WHERE t.owner_id = :userId;
 └────────────────────────────────────┘
 ```
 
-### Screen 6 — Settings
+### Screen 6 — Settings (extended for Part II)
 ```
-┌────────────────────────────┐
-│ Account Settings           │
-│                            │
-│ Change Password            │
-│  Current  ______________   │
-│  New      ______________   │
-│  Confirm  ______________   │
-│           [Update]         │
-└────────────────────────────┘
+┌──────────────────────────────────┐
+│ Account Settings                 │
+│                                  │
+│ Change Password                  │
+│  Current  __________________     │
+│  New      __________________     │
+│  Confirm  __________________     │
+│           [Update]               │
+│                                  │
+│ Time Zone                        │
+│  [Europe/Berlin              ▾]  │
+│           [Save]                 │
+└──────────────────────────────────┘
 ```
+
+### Screen 7 — Project members (Part II)
+```
+┌──────────────────────────────────────────┐
+│ AI-Driven Dev — Members        [+ Invite] │
+├──────────────────────────────────────────┤
+│ 👤 alice (you)       Owner               │
+│ 👤 bob               Member   [Remove]   │
+│ 👤 carol             Member   [Remove]   │
+│                                          │
+│ Invite by username:  __________  [Send]  │
+└──────────────────────────────────────────┘
+```
+
+### Screen 8 — Shared project task list (Part II)
+```
+┌───────────────────────────────────────────────────┐
+│ AI-Driven Dev — Tasks                             │
+│                                                   │
+│ Filter by user: [All users ▾]   [Export CSV ▾]    │
+│                                                   │
+│ [Task row] alice  Final Report   09:00–10:30  1.5h │
+│ [Task row] bob    Code Review    10:00–11:00  1.0h │
+│ [Task row] alice  ...                             │
+└───────────────────────────────────────────────────┘
+```
+
+---
+
+## 5b. Part II domain additions
+
+### New entity: ProjectMember
+
+```
+ProjectMember  (join table — User ↔ Project many-to-many, with role)
+  project_id  UUID FK → Project NOT NULL
+  user_id     UUID FK → User NOT NULL
+  role        VARCHAR(20) NOT NULL DEFAULT 'MEMBER'   -- 'OWNER' reserved for the project.owner
+  PRIMARY KEY (project_id, user_id)
+```
+
+The `Project.owner` field remains and denotes the creator/admin. `ProjectMember` rows represent additional participants. When checking access, the service layer must accept either `project.owner == currentUser` OR a `ProjectMember` row exists.
+
+### Updated entity: User (timezone added)
+
+```
+User
+  ...existing fields...
+  timezone    VARCHAR(50) NOT NULL DEFAULT 'UTC'       -- IANA tz string, e.g. "Europe/Berlin"
+```
+
+### Updated invariants (Part II)
+
+5. A user can see/add tasks to a project if and only if they are the owner **or** have a `ProjectMember` row for that project.
+6. Only the project owner can invite or remove members.
+7. Timestamps are always stored as UTC in the database; conversion to the user's preferred timezone happens on the frontend.
+8. The task list for a shared project returns tasks from **all** members, not just the requesting user.
+9. Export includes tasks from all members of a project and its subprojects.
+
+### Project sharing — access control rule
+
+```
+hasProjectAccess(user, project) =
+    project.owner == user
+    OR EXISTS (SELECT 1 FROM project_member WHERE project_id = project.id AND user_id = user.id)
+```
+
+This check must be applied in `ProjectService` for every read, write, and task-creation operation. Never rely on client-supplied user IDs.
+
+### Time aggregation update for shared projects
+
+The recursive CTE from §3 must be extended: remove the `WHERE t.owner_id = :userId` clause so that tasks from all members are included when computing total time for a shared project.
+
+```sql
+WITH RECURSIVE subtree AS (
+  SELECT id FROM project WHERE id = :projectId
+  UNION ALL
+  SELECT p.id FROM project p JOIN subtree s ON p.parent_id = s.id
+),
+task_ids AS (
+  SELECT DISTINCT tp.task_id
+  FROM task_project tp
+  WHERE tp.project_id IN (SELECT id FROM subtree)
+)
+SELECT COALESCE(SUM(
+  EXTRACT(EPOCH FROM (COALESCE(t.end_time, NOW()) - t.start_time))
+), 0) AS total_seconds
+FROM task t
+JOIN task_ids ti ON t.id = ti.task_id
+-- no owner filter — shared project includes all members' tasks
+```
+
+For per-user breakdown, add `GROUP BY t.owner_id`.
 
 ---
 
@@ -267,6 +377,8 @@ WHERE t.owner_id = :userId;
 | V2 | Create `project` table with self-referential FK |
 | V3 | Create `task` table |
 | V4 | Create `task_project` join table |
+| V5 | Create `project_member` table (project sharing) |
+| V6 | Add `timezone` column to `users` table (default `'UTC'`) |
 
 ---
 

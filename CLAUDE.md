@@ -2,11 +2,12 @@
 
 ## What is this project?
 
-A full-stack time-tracking web application for individuals (students, freelancers, researchers). Users register, log in, and track time spent on hierarchical projects. Tasks can be started/stopped in real time or added/edited manually. The app provides day/week/month overviews and aggregates time across project hierarchies. See `docs/final-project-part-1.md` for the full requirements spec.
+A full-stack time-tracking web application for individuals and teams (students, freelancers, researchers). Users register, log in, and track time spent on hierarchical projects. Tasks can be started/stopped in real time or added/edited manually. The app provides day/week/month overviews and aggregates time across project hierarchies. Projects can be shared between users, with task export and timezone support added in Part II. See `docs/final-project-part-1.md` and `docs/final-project-part-2.md` for the full requirements specs.
 
 ## Reference documents
 
-- `docs/final-project-part-1.md` — project requirements (read before implementing any feature)
+- `docs/final-project-part-1.md` — Part I requirements
+- `docs/final-project-part-2.md` — Part II requirements (project sharing, export, timezones, custom features)
 - `lectures/02-requirements.md` — user story and acceptance-criteria format
 - `lectures/03-prototyping.md` — architecture patterns (MVC, REST, repository)
 - `lectures/04-coding.md` — coding workflow: plan → generate → verify → refine
@@ -123,10 +124,13 @@ Examples:
 
 ### Security rules
 - Passwords hashed with BCrypt (strength ≥ 12)
-- All endpoints except `/api/auth/**` require a valid JWT
+- All endpoints except `POST /api/auth/register` and `POST /api/auth/login` require a valid JWT; Spring Security returns 401 (not 403) for missing/invalid tokens
 - User data is always scoped to the authenticated user (never trust client-supplied user IDs)
+- **Project access (Part II):** a user may access a project if and only if `project.owner == currentUser` OR a `ProjectMember` row exists — this check must be in `ProjectService`, never skipped
+- Only a project's owner can invite or remove members; members have read/write access to tasks only
 - Validate all user input at the controller layer using Bean Validation (`@Valid`)
 - Parameterized queries only — no string-concatenated HQL/SQL
+- Export endpoint must verify project membership before streaming data
 
 ### Testing rules
 - 90% line coverage required for both backend and frontend
@@ -143,6 +147,36 @@ cd backend && ./gradlew ktlintFormat --no-daemon
 cd ../frontend && npm run lint -- --fix
 ```
 
+## Part II — key technical decisions
+
+### Project sharing
+- New entity `ProjectMember` (V5 Flyway migration): columns `project_id`, `user_id`, `role VARCHAR(20)`
+- Access check helper in `ProjectService`: `project.owner == user OR memberRepository.existsByProjectAndUser(project, user)`
+- `ProjectService.getAll()` must UNION owned projects and member projects
+- Task creation for a project checks membership, not task ownership
+- Shared project task list (`GET /api/projects/{id}/tasks`): returns tasks from all members; supports `?userId=` filter
+- Time aggregation CTE: drop `WHERE t.owner_id = :userId` for shared projects; add `GROUP BY t.owner_id` for per-user breakdown
+
+### Export
+- Endpoint: `GET /api/projects/{id}/export` — access: owner or member
+- Query params: `?month=YYYY-MM` (monthly slice) or omit for all tasks
+- Scope: the project AND all its subprojects (recursive)
+- Format: CSV; columns: `username`, `project_path`, `description`, `start_time`, `end_time`, `duration_seconds`
+- Response: `Content-Type: text/csv`, `Content-Disposition: attachment; filename="export.csv"`
+- Running tasks (null `end_time`): include them with `end_time` left blank and `duration_seconds` up to `NOW()`
+
+### Time zones
+- New column: `users.timezone VARCHAR(50) NOT NULL DEFAULT 'UTC'` (V6 Flyway migration)
+- New endpoint: `PUT /api/auth/timezone` — body `{"timezone": "Europe/Berlin"}`; validate against `ZoneId.of()` on the backend
+- Backend stores all timestamps as UTC; no conversion on the backend side
+- Frontend converts UTC ISO strings to the user's timezone for display using the browser's `Intl.DateTimeFormat` or a library like `date-fns-tz`
+- Frontend pre-fills task start time in the user's timezone when opening the create-task form
+- User's timezone is returned as part of the profile/auth response so the frontend can use it without a separate request
+
+### Custom features (to be defined)
+- Three features required for Master's students; define the user story and acceptance criteria before implementing
+- Candidates: per-project time budgets with progress bar, task tags/labels for cross-project filtering, team dashboard showing all members' current status
+
 ## What NOT to do
 
 - Never expose entity classes directly in REST responses — always map to DTOs
@@ -151,4 +185,5 @@ cd ../frontend && npm run lint -- --fix
 - Never delete or modify the database schema manually — use Flyway migrations
 - Never use `git push --force` on main
 - Never hardcode user IDs or assume a specific user — always derive from JWT principal
+- Never skip the project membership check in `ProjectService` — non-members must not access shared project data
 - Do not add features beyond the current issue scope
