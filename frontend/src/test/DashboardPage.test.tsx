@@ -406,6 +406,91 @@ describe('DashboardPage', () => {
     expect(screen.getByTestId('current-task-loading')).toBeTruthy()
   })
 
+  it('shows project checkboxes in start form when projects exist', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      if (url.includes('/projects')) return Promise.resolve({
+        ok: true, status: 200,
+        json: async () => [{ id: 'p1', name: 'Work', description: null, color: null, parentId: null, createdAt: '2026-01-01T00:00:00Z', totalSeconds: 0 }],
+      })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <DashboardPage username="alice" onLogout={vi.fn()} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => screen.getByTestId('start-task-button'))
+    fireEvent.click(screen.getByTestId('start-task-button'))
+    await waitFor(() => expect(screen.getByTestId('start-project-p1')).toBeTruthy())
+  })
+
+  it('sends projectIds in start task body when project checkbox selected', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      if (url.includes('/projects')) return Promise.resolve({
+        ok: true, status: 200,
+        json: async () => [{ id: 'p1', name: 'Work', description: null, color: null, parentId: null, createdAt: '2026-01-01T00:00:00Z', totalSeconds: 0 }],
+      })
+      if (url.includes('/start') && opts?.method === 'POST') return Promise.resolve({
+        ok: true, status: 201,
+        json: async () => ({ id: 'new', description: null, startTime: new Date().toISOString(), endTime: null, projectIds: ['p1'], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }),
+      })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <DashboardPage username="alice" onLogout={vi.fn()} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => screen.getByTestId('start-task-button'))
+    fireEvent.click(screen.getByTestId('start-task-button'))
+    await waitFor(() => screen.getByTestId('start-project-p1'))
+    fireEvent.click(screen.getByTestId('start-project-p1'))
+    fireEvent.submit(screen.getByTestId('start-form'))
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url]: [string]) => url.includes('/start'))
+      expect(call).toBeTruthy()
+      const body = JSON.parse((call as [string, RequestInit])[1].body as string)
+      expect(body.projectIds).toEqual(['p1'])
+    })
+  })
+
+  it('auto-opens start form with pre-selected project from location state', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      if (url.includes('/projects')) return Promise.resolve({
+        ok: true, status: 200,
+        json: async () => [{ id: 'p1', name: 'Work', description: null, color: null, parentId: null, createdAt: '2026-01-01T00:00:00Z', totalSeconds: 0 }],
+      })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[{ pathname: '/dashboard', state: { startProjectIds: ['p1'], autoOpen: true } }]}>
+          <DashboardPage username="alice" onLogout={vi.fn()} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    // form should be open without clicking start button (auto-opened via location state)
+    await waitFor(() => expect(screen.getByTestId('start-form')).toBeTruthy())
+    // project checkbox should be pre-checked
+    await waitFor(() => {
+      const checkbox = screen.getByTestId('start-project-p1') as HTMLInputElement
+      expect(checkbox.checked).toBe(true)
+    })
+  })
+
   it('shows friendly error and refetches when start returns 409', async () => {
     const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
       if ((url as string).includes('/current')) return Promise.resolve({ ok: true, status: 204 })

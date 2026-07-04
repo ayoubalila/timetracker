@@ -5,8 +5,8 @@ import type { TaskResponse } from '../types/task'
 import type { ProjectResponse } from '../types/project'
 
 const mockProjects: ProjectResponse[] = [
-  { id: 'p1', name: 'Work', description: null, color: null, parentId: null, createdAt: '2026-01-01T00:00:00Z' },
-  { id: 'p2', name: 'Personal', description: null, color: null, parentId: null, createdAt: '2026-01-01T00:00:00Z' },
+  { id: 'p1', name: 'Work', description: null, color: null, parentId: null, createdAt: '2026-01-01T00:00:00Z', totalSeconds: 0 },
+  { id: 'p2', name: 'Personal', description: null, color: null, parentId: null, createdAt: '2026-01-01T00:00:00Z', totalSeconds: 0 },
 ]
 
 const mockTask: TaskResponse = {

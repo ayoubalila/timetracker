@@ -5,6 +5,12 @@ import { MemoryRouter } from 'react-router-dom'
 import { ProjectsPage } from '../pages/ProjectsPage'
 import type { ProjectResponse } from '../types/project'
 
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
+  return { ...actual, useNavigate: () => mockNavigate }
+})
+
 const project: ProjectResponse = {
   id: '1',
   name: 'Work',
@@ -12,6 +18,7 @@ const project: ProjectResponse = {
   color: null,
   parentId: null,
   createdAt: '2026-06-24T00:00:00Z',
+  totalSeconds: 0,
 }
 
 function setup() {
@@ -47,6 +54,7 @@ describe('ProjectsPage', () => {
   beforeEach(() => {
     localStorage.clear()
     vi.restoreAllMocks()
+    mockNavigate.mockClear()
   })
 
   it('shows loading state initially', () => {
@@ -271,5 +279,26 @@ describe('ProjectsPage', () => {
     // reset to top level
     fireEvent.change(select, { target: { value: '' } })
     expect(select.value).toBe('')
+  })
+
+  it('shows start-task-for-project-button when project is selected', async () => {
+    mockFetch([project])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    expect(screen.getByTestId('start-task-for-project-button')).toBeTruthy()
+  })
+
+  it('clicking start-task button navigates to dashboard with project id', async () => {
+    mockFetch([project])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('start-task-for-project-button'))
+    expect(mockNavigate).toHaveBeenCalledWith('/dashboard', {
+      state: { startProjectIds: ['1'], autoOpen: true },
+    })
   })
 })

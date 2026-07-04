@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ProjectTree } from '../components/ProjectTree'
 import {
@@ -58,6 +58,7 @@ interface ProjectsPageProps {
 
 export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newName, setNewName] = useState('')
@@ -177,7 +178,7 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
   }
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? null
-  const displayProject = selectedDetail ?? selectedProject
+  const displayProject = selectedProject
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -344,6 +345,17 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                 <div className="flex items-start justify-between mb-3">
                   <h2 className="text-xl font-semibold">{displayProject.name}</h2>
                   <div className="flex gap-2">
+                    <button
+                      onClick={() =>
+                        navigate('/dashboard', {
+                          state: { startProjectIds: [displayProject.id], autoOpen: true },
+                        })
+                      }
+                      className="text-sm text-green-600 hover:text-green-800 font-medium"
+                      data-testid="start-task-for-project-button"
+                    >
+                      ▶ Start task
+                    </button>
                     <button
                       onClick={() => startEdit(displayProject)}
                       className="text-sm text-blue-600 hover:text-blue-800"

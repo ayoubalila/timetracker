@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { LiveTimer } from '../components/LiveTimer'
 import { TaskForm } from '../components/TaskForm'
@@ -61,11 +61,14 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 
 export function DashboardPage({ username, onLogout }: DashboardPageProps) {
   const queryClient = useQueryClient()
+  const location = useLocation()
+  const locationState = location.state as { startProjectIds?: string[]; autoOpen?: boolean } | null
   const [activeTab, setActiveTab] = useState<Tab>('all')
-  const [showStartForm, setShowStartForm] = useState(false)
+  const [showStartForm, setShowStartForm] = useState(locationState?.autoOpen === true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingTask, setEditingTask] = useState<TaskResponse | null>(null)
   const [startDescription, setStartDescription] = useState('')
+  const [startProjectIds, setStartProjectIds] = useState<string[]>(locationState?.startProjectIds ?? [])
   const [formError, setFormError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('startTime')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -147,6 +150,7 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
       queryClient.invalidateQueries({ queryKey: ['overview-day'] })
       setShowStartForm(false)
       setStartDescription('')
+      setStartProjectIds([])
       setFormError(null)
     },
     onError: (err: Error) => {
@@ -215,7 +219,7 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
 
   function handleStart(e: React.FormEvent) {
     e.preventDefault()
-    startMutation.mutate({ description: startDescription || undefined })
+    startMutation.mutate({ description: startDescription || undefined, projectIds: startProjectIds })
   }
 
   function handleDelete(id: string) {
@@ -313,6 +317,7 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
                       data-testid="start-cancel"
                       onClick={() => {
                         setShowStartForm(false)
+                        setStartProjectIds([])
                         setFormError(null)
                       }}
                       className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50"
@@ -320,6 +325,35 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
                       Cancel
                     </button>
                   </div>
+                  {projects.length > 0 && (
+                    <fieldset>
+                      <legend className="text-xs text-gray-500 mb-1">Projects (optional)</legend>
+                      <div className="flex flex-wrap gap-2">
+                        {projects.map((p) => (
+                          <label key={p.id} className="flex items-center gap-1 text-sm cursor-pointer">
+                            <input
+                              data-testid={`start-project-${p.id}`}
+                              type="checkbox"
+                              checked={startProjectIds.includes(p.id)}
+                              onChange={() =>
+                                setStartProjectIds(
+                                  startProjectIds.includes(p.id)
+                                    ? startProjectIds.filter((id) => id !== p.id)
+                                    : [...startProjectIds, p.id],
+                                )
+                              }
+                            />
+                            <span
+                              className="px-2 py-0.5 rounded text-xs text-white"
+                              style={{ backgroundColor: p.color || '#6b7280' }}
+                            >
+                              {p.name}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  )}
                   {formError && (
                     <p data-testid="start-error" className="text-red-600 text-sm">
                       {formError}
