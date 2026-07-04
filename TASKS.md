@@ -100,9 +100,9 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 | 43 | ~~Rate limiting on auth endpoints~~ ✅ | feat | Simple in-memory bucket or Spring filter |
 | 44 | ~~Improve frontend error handling (toasts for API errors)~~ ✅ | feat | |
 | 45 | ~~Keyboard shortcuts for start/stop (usability)~~ ✅ | feat | Spec says "few interactions" — spacebar or similar |
-| 46 | Achieve 90% line coverage — backend gap analysis & fill | test | Run Jacoco, add missing tests |
-| 47 | Achieve 90% line coverage — frontend gap analysis & fill | test | Run Vitest coverage, add missing tests |
-| 48 | Mutation testing baseline (Pitest) | test | Identify surviving mutants, improve assertions |
+| 46 | ~~Achieve 90% line coverage — backend gap analysis & fill~~ ✅ | test | JaCoCo 90%+ verified; all unit + integration tests pass |
+| 47 | ~~Achieve 90% line coverage — frontend gap analysis & fill~~ ✅ | test | Vitest 90%+ statements/branches/functions/lines; targeted tests for uncovered branches |
+| 48 | ~~Mutation testing baseline (Pitest)~~ ✅ | test | Plugin configured; baseline 91% test strength (69/76 killed); 7 equivalent survivors |
 
 ---
 

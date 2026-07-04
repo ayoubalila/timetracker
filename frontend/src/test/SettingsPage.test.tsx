@@ -114,4 +114,30 @@ describe('SettingsPage', () => {
     expect(screen.getByTestId('nav-projects')).toBeTruthy()
     expect(screen.getByTestId('nav-settings')).toBeTruthy()
   })
+
+  it('shows "An error occurred" for non-Error thrown value', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue('not an error object'))
+
+    renderSettings()
+    fireEvent.change(screen.getByTestId('current-password-input'), { target: { value: 'oldpass1' } })
+    fireEvent.change(screen.getByTestId('new-password-input'), { target: { value: 'newpass1' } })
+    fireEvent.change(screen.getByTestId('confirm-password-input'), { target: { value: 'newpass1' } })
+    fireEvent.submit(screen.getByTestId('change-password-form'))
+
+    await waitFor(() => expect(screen.getByTestId('settings-error')).toBeTruthy())
+    expect(screen.getByTestId('settings-error').textContent).toBe('An error occurred')
+  })
+
+  it('shows generic error message for unexpected errors', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network failure')))
+
+    renderSettings()
+    fireEvent.change(screen.getByTestId('current-password-input'), { target: { value: 'oldpass1' } })
+    fireEvent.change(screen.getByTestId('new-password-input'), { target: { value: 'newpass1' } })
+    fireEvent.change(screen.getByTestId('confirm-password-input'), { target: { value: 'newpass1' } })
+    fireEvent.submit(screen.getByTestId('change-password-form'))
+
+    await waitFor(() => expect(screen.getByTestId('settings-error')).toBeTruthy())
+    expect(screen.getByTestId('settings-error').textContent).toContain('Network failure')
+  })
 })

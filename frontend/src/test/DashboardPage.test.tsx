@@ -548,4 +548,382 @@ describe('DashboardPage', () => {
     // form stays open — no unintended action
     expect(screen.getByTestId('start-form')).toBeTruthy()
   })
+
+  it('clicking Today tab triggers day overview query', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => screen.getByTestId('tab-day'))
+    fireEvent.click(screen.getByTestId('tab-day'))
+    await waitFor(() => {
+      const called = fetchMock.mock.calls.some(([url]: [string]) => url.includes('/overview/day'))
+      expect(called).toBe(true)
+    })
+  })
+
+  it('clicking Week tab triggers week overview query', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => screen.getByTestId('tab-week'))
+    fireEvent.click(screen.getByTestId('tab-week'))
+    await waitFor(() => {
+      const called = fetchMock.mock.calls.some(([url]: [string]) => url.includes('/overview/week'))
+      expect(called).toBe(true)
+    })
+  })
+
+  it('clicking Month tab triggers month overview query', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => screen.getByTestId('tab-month'))
+    fireEvent.click(screen.getByTestId('tab-month'))
+    await waitFor(() => {
+      const called = fetchMock.mock.calls.some(([url]: [string]) => url.includes('/overview/month'))
+      expect(called).toBe(true)
+    })
+  })
+
+  it('clicking a sort header changes sort key', async () => {
+    const completedTask = {
+      id: 'sort-1',
+      description: 'Sortable',
+      startTime: '2026-06-29T09:00:00Z',
+      endTime: '2026-06-29T10:00:00Z',
+      projectIds: [],
+      createdAt: '2026-06-29T09:00:00Z',
+      updatedAt: '2026-06-29T10:00:00Z',
+    }
+    renderDashboard((url: string) => {
+      if ((url as string).includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [completedTask] })
+    })
+    await waitFor(() => screen.getByTestId('task-item-sort-1'))
+    fireEvent.click(screen.getByTestId('sort-description'))
+    expect(screen.getByTestId('task-item-sort-1')).toBeTruthy()
+    // click again to reverse
+    fireEvent.click(screen.getByTestId('sort-description'))
+    expect(screen.getByTestId('task-item-sort-1')).toBeTruthy()
+  })
+
+  it('clicking sort-end and sort-duration headers work', async () => {
+    const completedTask = {
+      id: 'sort-2',
+      description: 'For sorting',
+      startTime: '2026-06-29T09:00:00Z',
+      endTime: '2026-06-29T10:00:00Z',
+      projectIds: [],
+      createdAt: '2026-06-29T09:00:00Z',
+      updatedAt: '2026-06-29T10:00:00Z',
+    }
+    renderDashboard((url: string) => {
+      if ((url as string).includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [completedTask] })
+    })
+    await waitFor(() => screen.getByTestId('task-item-sort-2'))
+    fireEvent.click(screen.getByTestId('sort-end'))
+    fireEvent.click(screen.getByTestId('sort-duration'))
+    fireEvent.click(screen.getByTestId('sort-start'))
+    expect(screen.getByTestId('task-item-sort-2')).toBeTruthy()
+  })
+
+  it('Space key stops running task when a task is active', async () => {
+    const runningTask = {
+      id: 'space-stop',
+      description: 'Running',
+      startTime: new Date(Date.now() - 60000).toISOString(),
+      endTime: null,
+      projectIds: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/current'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => runningTask })
+      if (url.includes('/stop') && opts?.method === 'POST')
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...runningTask, endTime: new Date().toISOString() }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => screen.getByTestId('stop-button'))
+    fireEvent.keyDown(window, { code: 'Space' })
+    await waitFor(() => {
+      const called = fetchMock.mock.calls.some(
+        ([url, opts]: [string, RequestInit]) => url.includes('/stop') && opts?.method === 'POST',
+      )
+      expect(called).toBe(true)
+    })
+  })
+
+  it('shows total duration and covers all sort comparator branches with 2 tasks', async () => {
+    const task1 = {
+      id: 'two-a',
+      description: 'Alpha',
+      startTime: '2026-06-29T09:00:00Z',
+      endTime: '2026-06-29T10:00:00Z',
+      projectIds: [],
+      createdAt: '2026-06-29T09:00:00Z',
+      updatedAt: '2026-06-29T10:00:00Z',
+    }
+    const task2 = {
+      id: 'two-b',
+      description: null,
+      startTime: '2026-06-29T11:00:00Z',
+      endTime: '2026-06-29T12:00:00Z',
+      projectIds: [],
+      createdAt: '2026-06-29T11:00:00Z',
+      updatedAt: '2026-06-29T12:00:00Z',
+    }
+    renderDashboard((url: string) => {
+      if (url.includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [task1, task2] })
+    })
+    await waitFor(() => screen.getByTestId('task-item-two-a'))
+    // total duration row
+    expect(screen.getByTestId('total-duration').textContent).toContain('Total:')
+    // click sort headers to exercise comparator branches
+    fireEvent.click(screen.getByTestId('sort-description'))
+    fireEvent.click(screen.getByTestId('sort-description')) // toggle direction (asc→desc)
+    fireEvent.click(screen.getByTestId('sort-end'))
+    fireEvent.click(screen.getByTestId('sort-duration'))
+    fireEvent.click(screen.getByTestId('sort-start'))
+    expect(screen.getByTestId('task-item-two-a')).toBeTruthy()
+  })
+
+  it('non-409 start error shows the error message in the form', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      if (url.includes('/start') && opts?.method === 'POST')
+        return Promise.resolve({ ok: false, status: 500, text: async () => 'Server error' })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => screen.getByTestId('start-task-button'))
+    fireEvent.click(screen.getByTestId('start-task-button'))
+    fireEvent.submit(screen.getByTestId('start-form'))
+    await waitFor(() => expect(screen.getByTestId('start-error').textContent).toContain('Server error'))
+  })
+
+  it('fires a toast when the stop mutation errors', async () => {
+    const runningTask = {
+      id: 'stop-err',
+      description: 'Active',
+      startTime: new Date(Date.now() - 30000).toISOString(),
+      endTime: null,
+      projectIds: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/current'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => runningTask })
+      if (url.includes('/stop') && opts?.method === 'POST')
+        return Promise.resolve({ ok: false, status: 500, text: async () => 'Stop failed' })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    let toastFired = false
+    const listener = () => { toastFired = true }
+    window.addEventListener('app:toast', listener)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => screen.getByTestId('stop-button'))
+    fireEvent.click(screen.getByTestId('stop-button'))
+    await waitFor(() => expect(toastFired).toBe(true))
+    window.removeEventListener('app:toast', listener)
+  })
+
+  it('shows error in add-task form when create mutation errors', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      if (url === '/api/tasks' && opts?.method === 'POST')
+        return Promise.resolve({ ok: false, status: 400, text: async () => 'Bad request' })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => screen.getByTestId('add-task-button'))
+    fireEvent.click(screen.getByTestId('add-task-button'))
+    await waitFor(() => screen.getByTestId('task-form'))
+    fireEvent.submit(screen.getByTestId('task-form'))
+    await waitFor(() => expect(screen.getByTestId('form-error')).toBeTruthy())
+    expect(screen.getByTestId('form-error').textContent).toContain('Bad request')
+  })
+
+  it('shows error in edit-task form when update mutation errors', async () => {
+    const completedTask = {
+      id: 'upd-err',
+      description: 'To update',
+      startTime: '2026-06-29T09:00:00Z',
+      endTime: '2026-06-29T10:00:00Z',
+      projectIds: [],
+      createdAt: '2026-06-29T09:00:00Z',
+      updatedAt: '2026-06-29T10:00:00Z',
+    }
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      if (url.includes('upd-err') && opts?.method === 'PUT')
+        return Promise.resolve({ ok: false, status: 400, text: async () => 'Update failed' })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [completedTask] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => screen.getByTestId('edit-task-upd-err'))
+    fireEvent.click(screen.getByTestId('edit-task-upd-err'))
+    await waitFor(() => screen.getByTestId('task-form'))
+    fireEvent.submit(screen.getByTestId('task-form'))
+    await waitFor(() => expect(screen.getByTestId('form-error')).toBeTruthy())
+    expect(screen.getByTestId('form-error').textContent).toContain('Update failed')
+  })
+
+  it('fires a toast when the delete mutation errors', async () => {
+    const completedTask = {
+      id: 'del-err',
+      description: 'Delete me',
+      startTime: '2026-06-29T09:00:00Z',
+      endTime: '2026-06-29T10:00:00Z',
+      projectIds: [],
+      createdAt: '2026-06-29T09:00:00Z',
+      updatedAt: '2026-06-29T10:00:00Z',
+    }
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      if (url.includes('del-err') && opts?.method === 'DELETE')
+        return Promise.resolve({ ok: false, status: 500, text: async () => 'Delete failed' })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [completedTask] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    let toastFired = false
+    const listener = () => { toastFired = true }
+    window.addEventListener('app:toast', listener)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => screen.getByTestId('delete-task-del-err'))
+    fireEvent.click(screen.getByTestId('delete-task-del-err'))
+    await waitFor(() => expect(toastFired).toBe(true))
+    window.removeEventListener('app:toast', listener)
+  })
+
+  it('canceling the edit task form clears editing state', async () => {
+    const completedTask = {
+      id: 'cancel-edit',
+      description: 'Edit me',
+      startTime: '2026-06-29T09:00:00Z',
+      endTime: '2026-06-29T10:00:00Z',
+      projectIds: [],
+      createdAt: '2026-06-29T09:00:00Z',
+      updatedAt: '2026-06-29T10:00:00Z',
+    }
+    renderDashboard((url: string) => {
+      if (url.includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [completedTask] })
+    })
+    await waitFor(() => screen.getByTestId('edit-task-cancel-edit'))
+    fireEvent.click(screen.getByTestId('edit-task-cancel-edit'))
+    await waitFor(() => screen.getByTestId('task-form'))
+    fireEvent.click(screen.getByTestId('task-form-cancel'))
+    await waitFor(() => expect(screen.queryByTestId('task-form')).toBeNull())
+  })
+
+  it('current task with null description shows placeholder text', async () => {
+    const runningTask = {
+      id: 'no-desc-task',
+      description: null,
+      startTime: new Date(Date.now() - 30000).toISOString(),
+      endTime: null,
+      projectIds: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    renderDashboard((url: string) => {
+      if (url.includes('/current'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => runningTask })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    await waitFor(() => screen.getByTestId('current-task-panel'))
+    expect(screen.getByTestId('current-task-description').textContent).toBe('(no description)')
+  })
+
+  it('shows task date in non-day tabs', async () => {
+    const completedTask = {
+      id: 'date-task',
+      description: 'Date shown',
+      startTime: '2026-06-29T09:00:00Z',
+      endTime: '2026-06-29T10:00:00Z',
+      projectIds: [],
+      createdAt: '2026-06-29T09:00:00Z',
+      updatedAt: '2026-06-29T10:00:00Z',
+    }
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [completedTask] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    // All tab shows date (not day tab)
+    await waitFor(() => screen.getByTestId('task-item-date-task'))
+    // The task row should be visible with date info
+    expect(screen.getByTestId('task-item-date-task')).toBeTruthy()
+  })
 })

@@ -36,6 +36,18 @@ class TaskServiceTest {
 
     private fun task(endTime: Instant? = null) = Task(startTime = now.minusSeconds(60), endTime = endTime, owner = alice)
 
+    // ── requireUser ────────────────────────────────────────────────────────────
+
+    @Test
+    fun `listAll throws 404 when user not found`() {
+        whenever(userRepository.findByUsername("ghost")).thenReturn(null)
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.listAll("ghost", null, null)
+            }
+        assertEquals(404, ex.statusCode.value())
+    }
+
     // ── listAll ────────────────────────────────────────────────────────────────
 
     @Test
@@ -121,8 +133,7 @@ class TaskServiceTest {
         whenever(taskRepository.existsByOwnerAndEndTimeIsNull(alice)).thenReturn(false)
         val project = Project(name = "Work", owner = alice)
         whenever(projectRepository.findByIdAndOwner(project.id, alice)).thenReturn(project)
-        val saved = task().also { it.projects = mutableSetOf(project) }
-        whenever(taskRepository.save(any<Task>())).thenReturn(saved)
+        whenever(taskRepository.save(any<Task>())).thenAnswer { it.arguments[0] as Task }
 
         val result = service.start("alice", StartTaskRequest(projectIds = listOf(project.id)))
 
@@ -256,7 +267,7 @@ class TaskServiceTest {
         stubAlice()
         val t = task()
         whenever(taskRepository.findByIdAndOwner(t.id, alice)).thenReturn(t)
-        whenever(taskRepository.save(any<Task>())).thenReturn(t)
+        whenever(taskRepository.save(any<Task>())).thenAnswer { it.arguments[0] as Task }
 
         val newStart = now.minusSeconds(7200)
         val newEnd = now.minusSeconds(3600)
@@ -267,7 +278,30 @@ class TaskServiceTest {
                 UpdateTaskRequest(description = "Updated", startTime = newStart, endTime = newEnd),
             )
 
-        assertNotNull(result)
+        assertEquals("Updated", result.description)
+        assertEquals(newStart, result.startTime)
+        assertEquals(newEnd, result.endTime)
+    }
+
+    @Test
+    fun `update persists project association`() {
+        stubAlice()
+        val t = task()
+        val project = Project(name = "Work", owner = alice)
+        whenever(taskRepository.findByIdAndOwner(t.id, alice)).thenReturn(t)
+        whenever(projectRepository.findByIdAndOwner(project.id, alice)).thenReturn(project)
+        whenever(taskRepository.save(any<Task>())).thenAnswer { it.arguments[0] as Task }
+
+        val newStart = now.minusSeconds(7200)
+        val newEnd = now.minusSeconds(3600)
+        val result =
+            service.update(
+                "alice",
+                t.id,
+                UpdateTaskRequest(startTime = newStart, endTime = newEnd, projectIds = listOf(project.id)),
+            )
+
+        assertEquals(listOf(project.id), result.projectIds)
     }
 
     @Test

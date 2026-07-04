@@ -31,6 +31,18 @@ class ProjectServiceTest {
 
     private fun stubAlice() = whenever(userRepository.findByUsername("alice")).thenReturn(alice)
 
+    // ── requireUser ────────────────────────────────────────────────────────────
+
+    @Test
+    fun `getAll throws 404 when user not found`() {
+        whenever(userRepository.findByUsername("ghost")).thenReturn(null)
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.getAll("ghost")
+            }
+        assertEquals(404, ex.statusCode.value())
+    }
+
     // ── getAll ─────────────────────────────────────────────────────────────────
 
     @Test
@@ -189,6 +201,25 @@ class ProjectServiceTest {
         assertEquals("Work", result.name)
     }
 
+    @Test
+    fun `update persists description and color changes`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice)
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.save(any<Project>())).thenAnswer { it.arguments[0] as Project }
+
+        val result =
+            service.update(
+                "alice",
+                p.id,
+                UpdateProjectRequest(name = "Work", description = "My desc", color = "#aabbcc"),
+            )
+
+        assertEquals("Work", result.name)
+        assertEquals("My desc", result.description)
+        assertEquals("#aabbcc", result.color)
+    }
+
     // ── delete ─────────────────────────────────────────────────────────────────
 
     @Test
@@ -216,6 +247,39 @@ class ProjectServiceTest {
     }
 
     // ── totalSeconds / time aggregation ────────────────────────────────────────
+
+    @Test
+    fun `getById with date range delegates to range query`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice)
+        val now = Instant.now()
+        val from = now.minusSeconds(3600)
+        val to = now
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findDistinctByProjectsInAndTimeRange(setOf(p), alice, from, to))
+            .thenReturn(emptyList())
+
+        val result = service.getById("alice", p.id, from, to)
+
+        verify(taskRepository).findDistinctByProjectsInAndTimeRange(setOf(p), alice, from, to)
+        assertEquals(0L, result.totalSeconds)
+    }
+
+    @Test
+    fun `getById counts running task duration up to now`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice)
+        val startTime = Instant.now().minusSeconds(60)
+        val runningTask = Task(startTime = startTime, endTime = null, owner = alice, projects = mutableSetOf(p))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findDistinctByProjectsIn(setOf(p), alice)).thenReturn(listOf(runningTask))
+
+        val result = service.getById("alice", p.id)
+
+        assertTrue(result.totalSeconds >= 59L)
+    }
 
     @Test
     fun `getById computes totalSeconds from tasks`() {
@@ -263,6 +327,24 @@ class ProjectServiceTest {
     }
 
     // ── getProjectTasks ────────────────────────────────────────────────────────
+
+    @Test
+    fun `getProjectTasks with date range delegates to range query`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice)
+        val now = Instant.now()
+        val from = now.minusSeconds(3600)
+        val to = now
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findDistinctByProjectsInAndTimeRange(setOf(p), alice, from, to))
+            .thenReturn(emptyList())
+
+        val result = service.getProjectTasks("alice", p.id, from, to)
+
+        verify(taskRepository).findDistinctByProjectsInAndTimeRange(setOf(p), alice, from, to)
+        assertEquals(0, result.size)
+    }
 
     @Test
     fun `getProjectTasks returns tasks for project and subprojects`() {

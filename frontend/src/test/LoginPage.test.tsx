@@ -91,6 +91,15 @@ describe('LoginPage', () => {
     await waitFor(() => expect(onLogin).toHaveBeenCalledWith('bob'))
   })
 
+  it('shows the error message when fetch throws a plain Error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection refused')))
+    render(<LoginPage onLogin={vi.fn()} />)
+    fireEvent.change(screen.getByTestId('input-username'), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByTestId('input-password'), { target: { value: 'pw' } })
+    fireEvent.click(screen.getByTestId('submit-button'))
+    await waitFor(() => expect(screen.getByTestId('error-message').textContent).toBe('Connection refused'))
+  })
+
   it('shows loading state while submitting', async () => {
     let resolve!: (v: unknown) => void
     const fetchPromise = new Promise((r) => { resolve = r })

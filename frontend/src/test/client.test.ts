@@ -93,4 +93,48 @@ describe('apiRequest', () => {
 
     await expect(apiRequest('/api/test')).rejects.toThrow('HTTP 500')
   })
+
+  it('uses json.message field when error response has one', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () => JSON.stringify({ message: 'Friendly error message' }),
+    }))
+
+    await expect(apiRequest('/api/test')).rejects.toThrow('Friendly error message')
+  })
+
+  it('dispatches auth:expired and clears token on 401 for non-auth path', async () => {
+    setToken('expiredtoken')
+    const listener = vi.fn()
+    window.addEventListener('auth:expired', listener)
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: async () => 'Unauthorized',
+    }))
+
+    try { await apiRequest('/api/tasks') } catch { /* expected */ }
+
+    expect(listener).toHaveBeenCalledOnce()
+    expect(getToken()).toBeNull()
+    window.removeEventListener('auth:expired', listener)
+  })
+
+  it('does not dispatch auth:expired on 401 for auth path', async () => {
+    const listener = vi.fn()
+    window.addEventListener('auth:expired', listener)
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: async () => 'Unauthorized',
+    }))
+
+    try { await apiRequest('/api/auth/login') } catch { /* expected */ }
+
+    expect(listener).not.toHaveBeenCalled()
+    window.removeEventListener('auth:expired', listener)
+  })
 })

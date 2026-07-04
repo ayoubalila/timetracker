@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { ProjectsPage } from '../pages/ProjectsPage'
 import type { ProjectResponse } from '../types/project'
+import type { TaskResponse } from '../types/task'
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -300,5 +301,136 @@ describe('ProjectsPage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/dashboard', {
       state: { startProjectIds: ['1'], autoOpen: true },
     })
+  })
+
+  // ── Task list coverage ────────────────────────────────────────────────────
+
+  const projTask1: TaskResponse = {
+    id: 'pt1',
+    description: 'Alpha task',
+    startTime: '2026-06-29T08:00:00Z',
+    endTime: '2026-06-29T09:00:00Z',
+    projectIds: ['1'],
+    createdAt: '2026-06-29T08:00:00Z',
+    updatedAt: '2026-06-29T09:00:00Z',
+  }
+  const projTask2: TaskResponse = {
+    id: 'pt2',
+    description: null,
+    startTime: '2026-06-29T10:00:00Z',
+    endTime: null,
+    projectIds: ['1'],
+    createdAt: '2026-06-29T10:00:00Z',
+    updatedAt: '2026-06-29T10:00:00Z',
+  }
+
+  function stubWithTasks(tasks: TaskResponse[] = [projTask1, projTask2]) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/tasks'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => tasks })
+        if (url.includes('/projects/'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 3600 }) })
+        return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+      }),
+    )
+  }
+
+  it('shows task rows including "(no description)" and "Running" placeholders', async () => {
+    stubWithTasks()
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('project-task-list'))
+    expect(screen.getByTestId('proj-task-pt1')).toBeTruthy()
+    expect(screen.getByTestId('proj-task-pt2')).toBeTruthy()
+    expect(screen.getByText('(no description)')).toBeTruthy()
+    expect(screen.getByText('Running')).toBeTruthy()
+  })
+
+  it('shows task count and total duration row', async () => {
+    stubWithTasks()
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('proj-total-duration'))
+    expect(screen.getByTestId('proj-total-duration').textContent).toContain('Total:')
+    expect(screen.getByText(/2 tasks/)).toBeTruthy()
+  })
+
+  it('shows singular task count for exactly 1 task', async () => {
+    stubWithTasks([projTask1])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('proj-task-pt1'))
+    expect(screen.getByText('1 task')).toBeTruthy()
+  })
+
+  it('clicking sort headers changes sort key and toggles direction', async () => {
+    stubWithTasks()
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('project-task-list'))
+    // click description — changes key
+    fireEvent.click(screen.getByTestId('proj-sort-description'))
+    // click description again — toggles direction
+    fireEvent.click(screen.getByTestId('proj-sort-description'))
+    // click other headers to exercise remaining sort branches
+    fireEvent.click(screen.getByTestId('proj-sort-start'))
+    fireEvent.click(screen.getByTestId('proj-sort-end'))
+    fireEvent.click(screen.getByTestId('proj-sort-duration'))
+    expect(screen.getByTestId('project-task-list')).toBeTruthy()
+  })
+
+  it('shows project description when set', async () => {
+    const projectWithDesc = { ...project, description: 'My project description' }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/tasks'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+        if (url.includes('/projects/'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...projectWithDesc, totalSeconds: 0 }) })
+        return Promise.resolve({ ok: true, status: 200, json: async () => [projectWithDesc] })
+      }),
+    )
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByText('My project description')).toBeTruthy())
+  })
+
+  it('shows date range filter and clear button, then clears on click', async () => {
+    mockFetch([project])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    // set a from date
+    fireEvent.change(screen.getByTestId('date-from'), { target: { value: '2026-06-01' } })
+    // clear button should appear
+    await waitFor(() => expect(screen.getByTestId('clear-date-range')).toBeTruthy())
+    // click clear
+    fireEvent.click(screen.getByTestId('clear-date-range'))
+    expect(screen.queryByTestId('clear-date-range')).toBeNull()
+  })
+
+  it('shows filtered label in task count when date range is set', async () => {
+    stubWithTasks([projTask1])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('proj-task-pt1'))
+    fireEvent.change(screen.getByTestId('date-from'), { target: { value: '2026-06-01' } })
+    await waitFor(() => expect(screen.getByText(/(filtered)/)).toBeTruthy())
   })
 })

@@ -8,6 +8,9 @@ import {
   getTask,
   updateTask,
   deleteTask,
+  getOverviewDay,
+  getOverviewWeek,
+  getOverviewMonth,
 } from '../api/tasks'
 
 const task = {
@@ -122,5 +125,33 @@ describe('tasks api', () => {
   it('deleteTask resolves for 204', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }))
     await expect(deleteTask('abc')).resolves.toBeUndefined()
+  })
+
+  it('getOverviewDay returns tasks for today', async () => {
+    mockFetch([task])
+    const result = await getOverviewDay()
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('abc')
+  })
+
+  it('getOverviewWeek returns tasks for this week', async () => {
+    mockFetch([task])
+    const result = await getOverviewWeek()
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('abc')
+  })
+
+  it('getOverviewMonth returns tasks for this month', async () => {
+    mockFetch([task])
+    const result = await getOverviewMonth()
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('abc')
+  })
+
+  it('listTasks without params omits query string', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    await listTasks()
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/tasks')
   })
 })

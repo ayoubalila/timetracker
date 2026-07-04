@@ -8,6 +8,7 @@ plugins {
     kotlin("plugin.jpa") version "1.9.25"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.2"
     id("jacoco")
+    id("info.solidsoft.pitest") version "1.15.0"
 }
 
 group = "com.timetracker"
@@ -88,6 +89,20 @@ tasks.jacocoTestCoverageVerification {
             }
         }
     }
+}
+
+// ── Pitest ────────────────────────────────────────────────────────────────────
+pitest {
+    targetClasses.set(listOf("com.timetracker.service.*"))
+    targetTests.set(listOf("com.timetracker.unit.*"))
+    junit5PluginVersion.set("1.2.1")
+    threads.set(2)
+    outputFormats.set(listOf("HTML", "XML"))
+    mutators.set(listOf("DEFAULTS"))
+    timeoutFactor.set("3.0".toBigDecimal())
+    timeoutConstInMillis.set(15000)
+    avoidCallsTo.set(listOf("kotlin.jvm.internal"))
+    verbose.set(true)
 }
 
 // ── ktlint ────────────────────────────────────────────────────────────────────

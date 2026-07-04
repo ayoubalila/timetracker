@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { listProjects, getProject, createProject, updateProject, deleteProject } from '../api/projects'
+import { listProjects, getProject, getProjectTasks, createProject, updateProject, deleteProject } from '../api/projects'
 
 const project = {
   id: '123',
@@ -61,5 +61,38 @@ describe('projects api', () => {
   it('createProject throws on 409', async () => {
     mockFetch('Conflict', 409)
     await expect(createProject({ name: 'Work' })).rejects.toThrow()
+  })
+
+  it('getProject appends from/to query params when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => project })
+    vi.stubGlobal('fetch', fetchMock)
+    await getProject('123', '2026-01-01T00:00:00Z', '2026-12-31T23:59:59Z')
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toContain('from=')
+    expect(url).toContain('to=')
+  })
+
+  it('getProject without params omits query string', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => project })
+    vi.stubGlobal('fetch', fetchMock)
+    await getProject('123')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/projects/123')
+  })
+
+  it('getProjectTasks returns task array', async () => {
+    const task = { id: 't1', description: 'Work', startTime: '2026-06-01T00:00:00Z', endTime: null, projectIds: ['123'], createdAt: '2026-06-01T00:00:00Z', updatedAt: '2026-06-01T00:00:00Z' }
+    mockFetch([task])
+    const result = await getProjectTasks('123')
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('t1')
+  })
+
+  it('getProjectTasks appends from/to params when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    await getProjectTasks('123', '2026-01-01T00:00:00Z', '2026-12-31T23:59:59Z')
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toContain('from=')
+    expect(url).toContain('to=')
   })
 })
