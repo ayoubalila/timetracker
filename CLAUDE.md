@@ -173,9 +173,34 @@ cd ../frontend && npm run lint -- --fix
 - Frontend pre-fills task start time in the user's timezone when opening the create-task form
 - User's timezone is returned as part of the profile/auth response so the frontend can use it without a separate request
 
-### Custom features (to be defined)
-- Three features required for Master's students; define the user story and acceptance criteria before implementing
-- Candidates: per-project time budgets with progress bar, task tags/labels for cross-project filtering, team dashboard showing all members' current status
+### Custom feature 1 — Task tags (M9A)
+- New entity `Tag` (id UUID, name VARCHAR(50), color VARCHAR(7), owner_id FK → users); new join table `task_tag` (tag_id FK, task_id FK)
+- Tags are **user-scoped**: each user owns their own tags; tags are never shared across users even on shared projects
+- Tag CRUD endpoints: `GET /api/tags`, `POST /api/tags`, `DELETE /api/tags/{id}`
+- `CreateTaskRequest` and `UpdateTaskRequest` accept `tagIds: List<UUID>`; `TaskResponse` includes `tags: List<TagResponse>`
+- Filter support: `?tagId=UUID` query param on `GET /api/tasks`, all `GET /api/overview/*` endpoints, and `GET /api/projects/{id}/tasks`
+- Export: add `tags` column (comma-separated names) to the CSV produced by `GET /api/projects/{id}/export`
+- Flyway V7: create `tag` table, then `task_tag` join table
+- Frontend: multi-select tag picker chip component in TaskForm; tag-filter dropdown on Dashboard and shared project task list
+
+### Custom feature 2 — Project time budgets (M9B)
+- Two new nullable columns on `project` table: `budget_seconds BIGINT`, `budget_period VARCHAR(20)` (values: `TOTAL`, `WEEKLY`, `MONTHLY`; null = no budget set)
+- No new table — just two columns on the existing `project` entity (Flyway V8)
+- `ProjectResponse` gains: `budgetSeconds`, `budgetPeriod`, `usedSeconds` (from existing aggregation), `budgetPercent` (computed: usedSeconds / budgetSeconds * 100, null if no budget)
+- For shared projects: budget measures **all members' combined time** (consistent with Part 2 shared-total semantics); do not filter by `owner_id`
+- Thresholds: ≥ 80% = yellow warning indicator; ≥ 100% = red exceeded indicator
+- Stop-task UX: after `POST /api/tasks/{id}/stop` resolves, frontend re-queries project aggregation and shows an inline alert if a threshold is newly crossed
+- Budget editing uses the existing `PUT /api/projects/{id}` endpoint (no new endpoint needed)
+
+### Custom feature 3 — Billable rates and cost reporting (M9C)
+- One new nullable column on `project`: `hourly_rate DECIMAL(10,2)` (Flyway V9); null means "inherit from nearest ancestor that has a rate"
+- Rate resolution in `ProjectService`: walk the `parent` chain upward until a non-null `hourly_rate` is found; return null if no ancestor has one. Cache the result as `effectiveHourlyRate` in `ProjectResponse`
+- Cost calculation: `cost = duration_seconds / 3600.0 * effectiveHourlyRate`; null if `effectiveHourlyRate` is null; for running tasks substitute `NOW()` for `endTime`
+- `ProjectResponse` gains: `hourlyRate` (the raw value, nullable), `effectiveHourlyRate` (resolved up the tree, nullable), `totalCost` (sum of task costs, nullable)
+- Task rows in the frontend show per-task cost alongside duration when an effective rate exists
+- CSV export: add `hourly_rate` and `cost` columns (blank cells when no effective rate); cost uses the same resolution logic
+- No currency stored — amounts are unitless decimals; the frontend labels them with a "€/h" hint
+- Rate editing uses the existing `PUT /api/projects/{id}` endpoint
 
 ## What NOT to do
 

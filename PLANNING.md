@@ -379,6 +379,9 @@ For per-user breakdown, add `GROUP BY t.owner_id`.
 | V4 | Create `task_project` join table |
 | V5 | Create `project_member` table (project sharing) |
 | V6 | Add `timezone` column to `users` table (default `'UTC'`) |
+| V7 | Create `tag` table and `task_tag` join table (custom: task tags) |
+| V8 | Add `budget_seconds` and `budget_period` columns to `project` (custom: time budgets) |
+| V9 | Add `hourly_rate` column to `project` (custom: billable rates) |
 
 ---
 

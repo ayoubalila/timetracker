@@ -154,17 +154,13 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 ---
 
-## Milestone 7E — Custom features (Week 4–5: Jul 13–16)
+## Milestone 7E → see Milestone 9
 
-| # | Issue title | Type | Notes |
-|---|-------------|------|-------|
-| 69 | [US] Custom feature 1 — TBD | feat | Must have user benefit; define before implementing (candidates: time budgets, tags/labels, team dashboard) |
-| 70 | [US] Custom feature 2 — TBD | feat | Required for Master's students |
-| 71 | [US] Custom feature 3 — TBD | feat | Required for Master's students |
+Custom features approved and detailed in **Milestone 9** below (issues 76–91).
 
 ---
 
-## Milestone 8 — Final submission prep (Week 5: Jul 16–19)
+## Milestone 8 — Final submission prep (Week 5: Jul 17–19)
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
@@ -172,6 +168,43 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 | 73 | Write project report (`report/report.md`) | docs | Include custom features section per Part 2 §3; link issues + PRs |
 | 74 | Final README review (all setup steps accurate?) | docs | |
 | 75 | Ensure all open issues are closed or explicitly deferred | chore | |
+
+---
+
+## Milestone 9A — Task tags with cross-cutting filter (Week 5: Jul 13–15)
+
+| # | Issue title | Type | Notes |
+|---|-------------|------|-------|
+| 76 | Flyway V7 — `tag` and `task_tag` tables | chore | `tag`(id UUID PK, name VARCHAR(50), color VARCHAR(7), owner_id FK → users); `task_tag`(tag_id FK, task_id FK, PK both) |
+| 77 | [US] Create and delete personal tags (name + color) | feat | `GET/POST/DELETE /api/tags`; tags are user-scoped (never shared across users) |
+| 78 | [US] Assign tags to a task via multi-select tag picker | feat | `tagIds: List<UUID>` in `CreateTaskRequest` + `UpdateTaskRequest`; `tags: List<TagResponse>` in `TaskResponse`; chips in TaskForm UI |
+| 79 | [US] Filter task list and overviews by tag | feat | `?tagId=UUID` on `GET /api/tasks`, `GET /api/overview/*`, `GET /api/projects/{id}/tasks`; tag-filter dropdown on dashboard |
+| 80 | Tags column in CSV export | feat | Comma-separated tag names as an extra column in `GET /api/projects/{id}/export` |
+| 81 | Unit + integration tests — tags | test | Cover tag CRUD, assignment, filter, export column |
+
+---
+
+## Milestone 9B — Project time budgets with progress alerts (Week 5: Jul 14–16)
+
+| # | Issue title | Type | Notes |
+|---|-------------|------|-------|
+| 82 | Flyway V8 — budget columns on `project` | chore | `budget_seconds BIGINT` (nullable), `budget_period VARCHAR(20)` (nullable; values: `TOTAL`, `WEEKLY`, `MONTHLY`) |
+| 83 | [US] Set a time budget on a project | feat | Budget fields in `CreateProjectRequest`/`UpdateProjectRequest`; `ProjectResponse` includes `budgetSeconds`, `budgetPeriod`, `usedSeconds`, `budgetPercent` |
+| 84 | [US] Progress bar and usage % on project detail and sidebar | feat | Bar turns yellow at ≥ 80%, red at ≥ 100%; shown next to total time |
+| 85 | [US] Inline warning when stopping a task crosses a budget threshold | feat | After `POST /api/tasks/{id}/stop`, frontend re-queries aggregated time and shows alert if threshold newly crossed |
+| 86 | Unit + integration tests — time budgets | test | Cover budget CRUD, aggregation comparison, shared-project combined total |
+
+---
+
+## Milestone 9C — Billable rates and cost reporting (Week 5: Jul 15–17)
+
+| # | Issue title | Type | Notes |
+|---|-------------|------|-------|
+| 87 | Flyway V9 — `hourly_rate` column on `project` | chore | `DECIMAL(10,2)` nullable; null = inherit from nearest ancestor with a rate |
+| 88 | [US] Set an hourly rate on a project (subprojects inherit) | feat | Rate field in project create/edit form; `ProjectResponse` includes `effectiveHourlyRate` (walks parent chain; null if none found) |
+| 89 | [US] View cost per task and total cost on project detail | feat | Task rows show cost = duration × effective rate; project header shows total cost alongside total time |
+| 90 | Cost columns in CSV export | feat | Add `hourly_rate` and `cost` columns to export (blank if no effective rate) |
+| 91 | Unit + integration tests — billable rates | test | Cover rate inheritance chain walk, zero-duration edge case, null-rate export column |
 
 ---
 
@@ -213,21 +246,25 @@ As a [role], I want [goal], so that [benefit].
 6. Milestone 5 (persistence verification) — confirm invariants
 7. Milestone 7A (project sharing) — Part II mandatory; new entity + security model
 8. Milestone 7B (shared task overview) — depends on sharing
-9. Milestone 7C (export) — depends on shared project task data
+9. Milestone 7C (export) — depends on shared project task data; M9C adds cost columns here
 10. Milestone 7D (time zones) — depends on user settings infrastructure
-11. Milestone 7E (custom features) — Master's requirement
-12. Milestone 6 (polish + coverage) — quality gate; do last before submission
-13. Milestone 8 (submission) — always last
+11. Milestone 9A (task tags) — Master's custom; add tag filter + export column after M7C exists
+12. Milestone 9B (time budgets) — Master's custom; reuses M4 aggregation
+13. Milestone 9C (billable rates) — Master's custom; adds cost columns on top of M7C export
+14. Milestone 6 (polish + coverage) — quality gate; do last before submission
+15. Milestone 8 (submission) — always last
 
 ## Remaining timeline (today: 2026-07-01 | deadline: 2026-07-19)
 
-| Week | Dates | Focus |
+| Slot | Dates | Focus |
 |------|-------|-------|
 | Week 3 | Jul 1–5 | M4 Task overview + time aggregation; M5 persistence verification |
 | Week 4a | Jul 6–9 | M7A Project sharing (backend + frontend) |
 | Week 4b | Jul 9–11 | M7B Shared task overview (all users + filter) |
 | Week 4c | Jul 10–12 | M7C Export (CSV endpoint + frontend download) |
 | Week 4d | Jul 12–13 | M7D Time zones (DB + settings + display) |
-| Week 5a | Jul 13–16 | M7E Custom features (3 for Master's) |
-| Week 5b | Jul 14–16 | M6 Coverage hardening + input validation |
-| Week 5c | Jul 16–19 | M8 Smoke test + report + final submission |
+| Week 5a | Jul 13–15 | M9A Task tags (Flyway V7, tag CRUD, task editor, filter, export column) |
+| Week 5b | Jul 14–16 | M9B Time budgets (Flyway V8, budget fields, progress bar, stop-task alert) |
+| Week 5c | Jul 15–17 | M9C Billable rates (Flyway V9, rate inheritance, cost display, export columns) |
+| Week 5d | Jul 16–18 | M6 Coverage hardening; input validation; fix any CI gaps |
+| Week 5e | Jul 17–19 | M8 Smoke test on clean Docker clone; write report; final submission |
