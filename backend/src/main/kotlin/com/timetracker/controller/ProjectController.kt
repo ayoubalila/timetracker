@@ -2,6 +2,7 @@ package com.timetracker.controller
 
 import com.timetracker.dto.CreateProjectRequest
 import com.timetracker.dto.ProjectResponse
+import com.timetracker.dto.TaskResponse
 import com.timetracker.dto.UpdateProjectRequest
 import com.timetracker.service.ProjectService
 import jakarta.validation.Valid
@@ -15,7 +16,9 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.time.Instant
 import java.util.UUID
 
 @RestController
@@ -41,7 +44,17 @@ class ProjectController(
     fun getById(
         @AuthenticationPrincipal username: String,
         @PathVariable id: UUID,
-    ): ResponseEntity<ProjectResponse> = ResponseEntity.ok(projectService.getById(username, id))
+        @RequestParam(required = false) from: Instant?,
+        @RequestParam(required = false) to: Instant?,
+    ): ResponseEntity<ProjectResponse> = ResponseEntity.ok(projectService.getById(username, id, from, to))
+
+    @GetMapping("/{id}/tasks")
+    fun getProjectTasks(
+        @AuthenticationPrincipal username: String,
+        @PathVariable id: UUID,
+        @RequestParam(required = false) from: Instant?,
+        @RequestParam(required = false) to: Instant?,
+    ): ResponseEntity<List<TaskResponse>> = ResponseEntity.ok(projectService.getProjectTasks(username, id, from, to))
 
     @PutMapping("/{id}")
     fun update(

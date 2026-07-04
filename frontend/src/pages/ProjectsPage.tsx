@@ -2,16 +2,53 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ProjectTree } from '../components/ProjectTree'
-import { listProjects, createProject, updateProject, deleteProject } from '../api/projects'
+import {
+  listProjects,
+  createProject,
+  updateProject,
+  deleteProject,
+  getProject,
+  getProjectTasks,
+} from '../api/projects'
 import { logoutApi } from '../api/auth'
 import { ApiError } from '../api/client'
 import type { ProjectResponse } from '../types/project'
+import type { TaskResponse } from '../types/task'
+
+type SortKey = 'startTime' | 'endTime' | 'duration' | 'description'
+type SortDir = 'asc' | 'desc'
 
 function projectErrorMessage(err: Error): string {
   if (err instanceof ApiError && err.status === 409) {
     return 'A project with this name already exists at this level'
   }
   return err.message
+}
+
+function durationSeconds(task: TaskResponse): number {
+  const end = task.endTime ? new Date(task.endTime).getTime() : Date.now()
+  return Math.max(0, Math.floor((end - new Date(task.startTime).getTime()) / 1000))
+}
+
+function formatDuration(secs: number): string {
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  if (h > 0) return `${h}h ${m}m`
+  return `${m}m`
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <span className="text-gray-300 ml-1">↕</span>
+  return <span className="text-blue-600 ml-1">{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
 interface ProjectsPageProps {
@@ -21,18 +58,52 @@ interface ProjectsPageProps {
 
 export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
   const queryClient = useQueryClient()
-  const [selectedProject, setSelectedProject] = useState<ProjectResponse | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newName, setNewName] = useState('')
   const [newParentId, setNewParentId] = useState<string | null>(null)
   const [editingProject, setEditingProject] = useState<ProjectResponse | null>(null)
   const [editName, setEditName] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('startTime')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: listProjects,
   })
+
+  const fromIso = dateFrom ? new Date(dateFrom).toISOString() : undefined
+  const toIso = dateTo ? new Date(dateTo + 'T23:59:59').toISOString() : undefined
+
+  const { data: selectedDetail } = useQuery({
+    queryKey: ['project-detail', selectedProjectId, fromIso, toIso],
+    queryFn: () => getProject(selectedProjectId!, fromIso, toIso),
+    enabled: selectedProjectId !== null,
+  })
+
+  const { data: projectTasks = [] } = useQuery({
+    queryKey: ['project-tasks', selectedProjectId, fromIso, toIso],
+    queryFn: () => getProjectTasks(selectedProjectId!, fromIso, toIso),
+    enabled: selectedProjectId !== null,
+  })
+
+  const sortedTasks = [...projectTasks].sort((a, b) => {
+    let diff = 0
+    if (sortKey === 'startTime') diff = new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    else if (sortKey === 'endTime')
+      diff = new Date(a.endTime ?? '').getTime() - new Date(b.endTime ?? '').getTime()
+    else if (sortKey === 'duration') diff = durationSeconds(a) - durationSeconds(b)
+    else if (sortKey === 'description') diff = (a.description ?? '').localeCompare(b.description ?? '')
+    return sortDir === 'asc' ? diff : -diff
+  })
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('desc') }
+  }
 
   const createMutation = useMutation({
     mutationFn: createProject,
@@ -61,7 +132,7 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
     mutationFn: deleteProject,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
-      setSelectedProject(null)
+      setSelectedProjectId(null)
     },
   })
 
@@ -94,6 +165,20 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
     }
   }
 
+  function handleSelectProject(project: ProjectResponse) {
+    setSelectedProjectId(project.id)
+    setDateFrom('')
+    setDateTo('')
+  }
+
+  function handleClearDateRange() {
+    setDateFrom('')
+    setDateTo('')
+  }
+
+  const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? null
+  const displayProject = selectedDetail ?? selectedProject
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
@@ -120,13 +205,16 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
         </div>
       </header>
 
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
-        <aside className="w-64 bg-gray-50 border-r p-4 flex flex-col gap-4">
+        <aside className="w-64 bg-gray-50 border-r p-4 flex flex-col gap-4 overflow-y-auto">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Projects</h2>
             <button
-              onClick={() => { setShowCreateForm(true); setNewParentId(null) }}
+              onClick={() => {
+                setShowCreateForm(true)
+                setNewParentId(null)
+              }}
               className="text-blue-600 hover:text-blue-800 text-sm font-medium"
               data-testid="new-project-button"
             >
@@ -139,14 +227,14 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
           ) : (
             <ProjectTree
               projects={projects}
-              onSelect={setSelectedProject}
-              selectedId={selectedProject?.id}
+              onSelect={handleSelectProject}
+              selectedId={selectedProjectId ?? undefined}
             />
           )}
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-6 overflow-y-auto">
           {/* Create form */}
           {showCreateForm && (
             <div className="bg-white rounded-lg border p-4 mb-6 max-w-md" data-testid="create-form">
@@ -178,7 +266,11 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                     ))}
                   </select>
                 </div>
-                {formError && <p className="text-red-600 text-sm" data-testid="form-error">{formError}</p>}
+                {formError && (
+                  <p className="text-red-600 text-sm" data-testid="form-error">
+                    {formError}
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <button
                     type="submit"
@@ -190,7 +282,10 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setShowCreateForm(false); setFormError(null) }}
+                    onClick={() => {
+                      setShowCreateForm(false)
+                      setFormError(null)
+                    }}
                     className="px-4 py-2 rounded text-sm border"
                     data-testid="create-cancel"
                   >
@@ -227,7 +322,10 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setEditingProject(null); setFormError(null) }}
+                    onClick={() => {
+                      setEditingProject(null)
+                      setFormError(null)
+                    }}
                     className="px-4 py-2 rounded text-sm border"
                     data-testid="edit-cancel"
                   >
@@ -239,41 +337,178 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
           )}
 
           {/* Selected project detail */}
-          {selectedProject && !editingProject && (
-            <div className="bg-white rounded-lg border p-6 max-w-lg" data-testid="project-detail">
-              <div className="flex items-start justify-between mb-4">
-                <h2 className="text-xl font-semibold">{selectedProject.name}</h2>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => startEdit(selectedProject)}
-                    className="text-sm text-blue-600 hover:text-blue-800"
-                    data-testid="edit-button"
-                  >
-                    Rename
-                  </button>
-                  <button
-                    onClick={() => handleDelete(selectedProject)}
-                    className="text-sm text-red-600 hover:text-red-800"
-                    data-testid="delete-button"
-                  >
-                    Delete
-                  </button>
+          {displayProject && !editingProject && (
+            <div data-testid="project-detail">
+              {/* Project header */}
+              <div className="bg-white rounded-lg border p-6 mb-4">
+                <div className="flex items-start justify-between mb-3">
+                  <h2 className="text-xl font-semibold">{displayProject.name}</h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => startEdit(displayProject)}
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                      data-testid="edit-button"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      onClick={() => handleDelete(displayProject)}
+                      className="text-sm text-red-600 hover:text-red-800"
+                      data-testid="delete-button"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
+
+                {displayProject.description && (
+                  <p className="text-gray-600 text-sm mb-3">{displayProject.description}</p>
+                )}
+
+                {/* Total time */}
+                <div
+                  data-testid="project-total-time"
+                  className="text-sm text-gray-700"
+                >
+                  Total time:{' '}
+                  <span className="font-semibold text-blue-700">
+                    {formatDuration(selectedDetail?.totalSeconds ?? 0)}
+                  </span>
+                </div>
+
+                {/* Date range filter */}
+                <div className="mt-4 flex items-end gap-3 flex-wrap">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">From</label>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="border rounded px-2 py-1 text-sm"
+                      data-testid="date-from"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">To</label>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="border rounded px-2 py-1 text-sm"
+                      data-testid="date-to"
+                    />
+                  </div>
+                  {(dateFrom || dateTo) && (
+                    <button
+                      onClick={handleClearDateRange}
+                      className="text-xs text-gray-500 hover:text-gray-700 pb-1"
+                      data-testid="clear-date-range"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowCreateForm(true)
+                    setNewParentId(displayProject.id)
+                  }}
+                  className="mt-4 text-sm text-blue-600 hover:text-blue-800"
+                  data-testid="add-subproject-button"
+                >
+                  + Add subproject
+                </button>
               </div>
-              {selectedProject.description && (
-                <p className="text-gray-600 text-sm">{selectedProject.description}</p>
-              )}
-              <button
-                onClick={() => { setShowCreateForm(true); setNewParentId(selectedProject.id) }}
-                className="mt-4 text-sm text-blue-600 hover:text-blue-800"
-                data-testid="add-subproject-button"
-              >
-                + Add subproject
-              </button>
+
+              {/* Task list */}
+              <div className="bg-white rounded-lg border overflow-hidden">
+                <div className="px-4 py-3 border-b flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-gray-700">Tasks</h3>
+                  <span className="text-xs text-gray-400">
+                    {projectTasks.length} task{projectTasks.length !== 1 ? 's' : ''}
+                    {(dateFrom || dateTo) ? ' (filtered)' : ''}
+                  </span>
+                </div>
+
+                {sortedTasks.length === 0 ? (
+                  <p className="px-4 py-6 text-sm text-gray-500" data-testid="project-tasks-empty">
+                    No tasks associated with this project.
+                  </p>
+                ) : (
+                  <>
+                    {/* Table header */}
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-2 bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      <button
+                        className="text-left flex items-center"
+                        onClick={() => handleSort('description')}
+                        data-testid="proj-sort-description"
+                      >
+                        Description
+                        <SortIcon active={sortKey === 'description'} dir={sortDir} />
+                      </button>
+                      <button
+                        className="text-right flex items-center justify-end"
+                        onClick={() => handleSort('startTime')}
+                        data-testid="proj-sort-start"
+                      >
+                        Start
+                        <SortIcon active={sortKey === 'startTime'} dir={sortDir} />
+                      </button>
+                      <button
+                        className="text-right flex items-center justify-end"
+                        onClick={() => handleSort('endTime')}
+                        data-testid="proj-sort-end"
+                      >
+                        End
+                        <SortIcon active={sortKey === 'endTime'} dir={sortDir} />
+                      </button>
+                      <button
+                        className="text-right flex items-center justify-end"
+                        onClick={() => handleSort('duration')}
+                        data-testid="proj-sort-duration"
+                      >
+                        Duration
+                        <SortIcon active={sortKey === 'duration'} dir={sortDir} />
+                      </button>
+                    </div>
+
+                    {/* Rows */}
+                    <ul data-testid="project-task-list">
+                      {sortedTasks.map((task) => (
+                        <li
+                          key={task.id}
+                          data-testid={`proj-task-${task.id}`}
+                          className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-3 border-b last:border-0 text-sm items-center"
+                        >
+                          <span className="truncate">{task.description || '(no description)'}</span>
+                          <span className="text-gray-500 text-right whitespace-nowrap">
+                            {formatTime(task.startTime)}
+                          </span>
+                          <span className="text-gray-500 text-right whitespace-nowrap">
+                            {task.endTime ? formatTime(task.endTime) : <em className="text-green-600">Running</em>}
+                          </span>
+                          <span className="text-gray-700 font-medium text-right whitespace-nowrap">
+                            {formatDuration(durationSeconds(task))}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* Total row */}
+                    <div className="px-4 py-2 border-t text-right text-sm text-gray-600" data-testid="proj-total-duration">
+                      Total:{' '}
+                      <span className="font-semibold">
+                        {formatDuration(sortedTasks.reduce((s, t) => s + durationSeconds(t), 0))}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
 
-          {!selectedProject && !showCreateForm && !editingProject && (
+          {!displayProject && !showCreateForm && !editingProject && (
             <div className="text-gray-500 text-sm" data-testid="empty-state">
               {projects.length === 0
                 ? 'Create your first project using the "+ New" button.'

@@ -1,12 +1,25 @@
 import { apiRequest } from './client'
 import type { ProjectResponse, CreateProjectRequest, UpdateProjectRequest } from '../types/project'
+import type { TaskResponse } from '../types/task'
 
 export async function listProjects(): Promise<ProjectResponse[]> {
   return apiRequest<ProjectResponse[]>('/api/projects')
 }
 
-export async function getProject(id: string): Promise<ProjectResponse> {
-  return apiRequest<ProjectResponse>(`/api/projects/${id}`)
+export async function getProject(id: string, from?: string, to?: string): Promise<ProjectResponse> {
+  const params = new URLSearchParams()
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  const query = params.toString()
+  return apiRequest<ProjectResponse>(`/api/projects/${id}${query ? `?${query}` : ''}`)
+}
+
+export async function getProjectTasks(id: string, from?: string, to?: string): Promise<TaskResponse[]> {
+  const params = new URLSearchParams()
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  const query = params.toString()
+  return apiRequest<TaskResponse[]>(`/api/projects/${id}/tasks${query ? `?${query}` : ''}`)
 }
 
 export async function createProject(request: CreateProjectRequest): Promise<ProjectResponse> {

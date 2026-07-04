@@ -3,11 +3,26 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { LiveTimer } from '../components/LiveTimer'
 import { TaskForm } from '../components/TaskForm'
-import { getCurrentTask, listTasks, startTask, stopTask, createTask, updateTask, deleteTask } from '../api/tasks'
+import {
+  getCurrentTask,
+  listTasks,
+  startTask,
+  stopTask,
+  createTask,
+  updateTask,
+  deleteTask,
+  getOverviewDay,
+  getOverviewWeek,
+  getOverviewMonth,
+} from '../api/tasks'
 import { listProjects } from '../api/projects'
 import { logoutApi } from '../api/auth'
 import { ApiError } from '../api/client'
 import type { TaskResponse } from '../types/task'
+
+type Tab = 'all' | 'day' | 'week' | 'month'
+type SortKey = 'startTime' | 'endTime' | 'duration' | 'description'
+type SortDir = 'asc' | 'desc'
 
 interface DashboardPageProps {
   username: string
@@ -18,34 +33,74 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function formatDuration(startIso: string, endIso: string | null): string {
-  const end = endIso ? new Date(endIso).getTime() : Date.now()
-  const secs = Math.floor((end - new Date(startIso).getTime()) / 1000)
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
+
+function durationSeconds(task: TaskResponse): number {
+  const end = task.endTime ? new Date(task.endTime).getTime() : Date.now()
+  return Math.max(0, Math.floor((end - new Date(task.startTime).getTime()) / 1000))
+}
+
+function formatDuration(secs: number): string {
   const h = Math.floor(secs / 3600)
   const m = Math.floor((secs % 3600) / 60)
   if (h > 0) return `${h}h ${m}m`
   return `${m}m`
 }
 
+function totalDuration(tasks: TaskResponse[]): string {
+  const secs = tasks.reduce((sum, t) => sum + durationSeconds(t), 0)
+  return formatDuration(secs)
+}
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <span className="text-gray-300 ml-1">↕</span>
+  return <span className="text-blue-600 ml-1">{dir === 'asc' ? '↑' : '↓'}</span>
+}
+
 export function DashboardPage({ username, onLogout }: DashboardPageProps) {
   const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<Tab>('all')
   const [showStartForm, setShowStartForm] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingTask, setEditingTask] = useState<TaskResponse | null>(null)
   const [startDescription, setStartDescription] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
+  const [sortKey, setSortKey] = useState<SortKey>('startTime')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
 
   const { data: currentTaskData, isLoading: currentTaskLoading } = useQuery({
     queryKey: ['current-task'],
     queryFn: getCurrentTask,
   })
-  const currentTask = currentTaskData && typeof currentTaskData === 'object' && 'id' in currentTaskData
-    ? currentTaskData
-    : null
+  const currentTask =
+    currentTaskData && typeof currentTaskData === 'object' && 'id' in currentTaskData
+      ? currentTaskData
+      : null
 
-  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
+  const { data: allTasks = [], isLoading: allLoading } = useQuery({
     queryKey: ['tasks'],
     queryFn: () => listTasks(),
+    enabled: activeTab === 'all',
+  })
+
+  const { data: dayTasks = [], isLoading: dayLoading } = useQuery({
+    queryKey: ['overview-day'],
+    queryFn: getOverviewDay,
+    enabled: activeTab === 'day',
+  })
+
+  const { data: weekTasks = [], isLoading: weekLoading } = useQuery({
+    queryKey: ['overview-week'],
+    queryFn: getOverviewWeek,
+    enabled: activeTab === 'week',
+  })
+
+  const { data: monthTasks = [], isLoading: monthLoading } = useQuery({
+    queryKey: ['overview-month'],
+    queryFn: getOverviewMonth,
+    enabled: activeTab === 'month',
   })
 
   const { data: projects = [] } = useQuery({
@@ -53,11 +108,43 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
     queryFn: listProjects,
   })
 
+  const rawTasks: TaskResponse[] =
+    activeTab === 'day'
+      ? dayTasks
+      : activeTab === 'week'
+        ? weekTasks
+        : activeTab === 'month'
+          ? monthTasks
+          : allTasks
+
+  const isLoading = activeTab === 'day' ? dayLoading : activeTab === 'week' ? weekLoading : activeTab === 'month' ? monthLoading : allLoading
+
+  const completedTasks = rawTasks.filter((t) => t.endTime !== null)
+
+  const sortedTasks = [...completedTasks].sort((a, b) => {
+    let diff = 0
+    if (sortKey === 'startTime') diff = new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    else if (sortKey === 'endTime') diff = new Date(a.endTime!).getTime() - new Date(b.endTime!).getTime()
+    else if (sortKey === 'duration') diff = durationSeconds(a) - durationSeconds(b)
+    else if (sortKey === 'description') diff = (a.description ?? '').localeCompare(b.description ?? '')
+    return sortDir === 'asc' ? diff : -diff
+  })
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
+  }
+
   const startMutation = useMutation({
     mutationFn: startTask,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['current-task'] })
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-day'] })
       setShowStartForm(false)
       setStartDescription('')
       setFormError(null)
@@ -77,6 +164,9 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['current-task'] })
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-day'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-week'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-month'] })
     },
   })
 
@@ -84,6 +174,9 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
     mutationFn: createTask,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-day'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-week'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-month'] })
       setShowAddForm(false)
       setFormError(null)
     },
@@ -91,11 +184,13 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateTask>[1] }) =>
-      updateTask(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateTask>[1] }) => updateTask(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: ['current-task'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-day'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-week'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-month'] })
       setEditingTask(null)
       setFormError(null)
     },
@@ -107,6 +202,9 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: ['current-task'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-day'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-week'] })
+      queryClient.invalidateQueries({ queryKey: ['overview-month'] })
     },
   })
 
@@ -126,9 +224,12 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
     }
   }
 
-  const completedTasks = Array.isArray(tasks)
-    ? tasks.filter((t: TaskResponse) => t.endTime !== null)
-    : []
+  const tabLabels: Record<Tab, string> = {
+    all: 'All',
+    day: 'Today',
+    week: 'This week',
+    month: 'This month',
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -156,12 +257,10 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6">
+      <main className="max-w-4xl mx-auto px-4 py-6">
         {/* Current task */}
         <section className="mb-6">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-            Current Task
-          </h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Current Task</h2>
           {currentTaskLoading ? (
             <div className="bg-white border rounded-lg p-4">
               <p className="text-sm text-gray-400" data-testid="current-task-loading">Loading…</p>
@@ -175,9 +274,7 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
                 <p data-testid="current-task-description" className="font-medium">
                   {currentTask.description || '(no description)'}
                 </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  Started {formatTime(currentTask.startTime)}
-                </p>
+                <p className="text-sm text-gray-500 mt-1">Started {formatTime(currentTask.startTime)}</p>
               </div>
               <LiveTimer startTime={currentTask.startTime} />
               <button
@@ -214,14 +311,19 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
                     <button
                       type="button"
                       data-testid="start-cancel"
-                      onClick={() => { setShowStartForm(false); setFormError(null) }}
+                      onClick={() => {
+                        setShowStartForm(false)
+                        setFormError(null)
+                      }}
                       className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50"
                     >
                       Cancel
                     </button>
                   </div>
                   {formError && (
-                    <p data-testid="start-error" className="text-red-600 text-sm">{formError}</p>
+                    <p data-testid="start-error" className="text-red-600 text-sm">
+                      {formError}
+                    </p>
                   )}
                 </form>
               ) : (
@@ -237,59 +339,135 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
           )}
         </section>
 
-        {/* Task list */}
+        {/* Task overview tabs */}
         <section>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Tasks
-            </h2>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex gap-1">
+              {(['all', 'day', 'week', 'month'] as Tab[]).map((tab) => (
+                <button
+                  key={tab}
+                  data-testid={`tab-${tab}`}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-3 py-1.5 text-sm rounded ${
+                    activeTab === tab
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white border text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {tabLabels[tab]}
+                </button>
+              ))}
+            </div>
             <button
               data-testid="add-task-button"
-              onClick={() => { setShowAddForm(true); setFormError(null) }}
+              onClick={() => {
+                setShowAddForm(true)
+                setFormError(null)
+              }}
               className="text-sm text-blue-600 hover:underline"
             >
               + Add task
             </button>
           </div>
 
-          {tasksLoading ? (
-            <p className="text-sm text-gray-500" data-testid="tasks-loading">Loading…</p>
-          ) : completedTasks.length === 0 ? (
-            <p className="text-sm text-gray-500" data-testid="tasks-empty">No completed tasks yet.</p>
+          {isLoading ? (
+            <p className="text-sm text-gray-500" data-testid="tasks-loading">
+              Loading…
+            </p>
+          ) : sortedTasks.length === 0 ? (
+            <p className="text-sm text-gray-500" data-testid="tasks-empty">
+              No completed tasks{activeTab !== 'all' ? ` for ${tabLabels[activeTab].toLowerCase()}` : ''}.
+            </p>
           ) : (
-            <ul data-testid="task-list" className="space-y-2">
-              {completedTasks.map((task: TaskResponse) => (
-                <li
-                  key={task.id}
-                  data-testid={`task-item-${task.id}`}
-                  className="bg-white border rounded-lg px-4 py-3 flex items-center gap-4"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">
-                      {task.description || '(no description)'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatTime(task.startTime)} – {task.endTime ? formatTime(task.endTime) : '—'}{' '}
-                      · {formatDuration(task.startTime, task.endTime)}
-                    </p>
-                  </div>
+            <>
+              <div className="bg-white border rounded-lg overflow-hidden">
+                {/* Table header */}
+                <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-2 bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   <button
-                    data-testid={`edit-task-${task.id}`}
-                    onClick={() => { setEditingTask(task); setFormError(null) }}
-                    className="text-xs text-blue-600 hover:underline"
+                    className="text-left flex items-center"
+                    onClick={() => handleSort('description')}
+                    data-testid="sort-description"
                   >
-                    Edit
+                    Description
+                    <SortIcon active={sortKey === 'description'} dir={sortDir} />
                   </button>
                   <button
-                    data-testid={`delete-task-${task.id}`}
-                    onClick={() => handleDelete(task.id)}
-                    className="text-xs text-red-600 hover:underline"
+                    className="text-right flex items-center justify-end"
+                    onClick={() => handleSort('startTime')}
+                    data-testid="sort-start"
                   >
-                    Delete
+                    Start
+                    <SortIcon active={sortKey === 'startTime'} dir={sortDir} />
                   </button>
-                </li>
-              ))}
-            </ul>
+                  <button
+                    className="text-right flex items-center justify-end"
+                    onClick={() => handleSort('endTime')}
+                    data-testid="sort-end"
+                  >
+                    End
+                    <SortIcon active={sortKey === 'endTime'} dir={sortDir} />
+                  </button>
+                  <button
+                    className="text-right flex items-center justify-end"
+                    onClick={() => handleSort('duration')}
+                    data-testid="sort-duration"
+                  >
+                    Duration
+                    <SortIcon active={sortKey === 'duration'} dir={sortDir} />
+                  </button>
+                  <span className="text-right">Actions</span>
+                </div>
+
+                {/* Task rows */}
+                <ul data-testid="task-list">
+                  {sortedTasks.map((task) => (
+                    <li
+                      key={task.id}
+                      data-testid={`task-item-${task.id}`}
+                      className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-3 border-b last:border-0 items-center text-sm"
+                    >
+                      <span className="truncate font-medium">{task.description || '(no description)'}</span>
+                      <span className="text-gray-500 text-right whitespace-nowrap">
+                        {activeTab !== 'day' && (
+                          <span className="mr-1 text-xs text-gray-400">{formatDate(task.startTime)}</span>
+                        )}
+                        {formatTime(task.startTime)}
+                      </span>
+                      <span className="text-gray-500 text-right whitespace-nowrap">
+                        {task.endTime ? formatTime(task.endTime) : '—'}
+                      </span>
+                      <span className="text-gray-700 text-right font-medium whitespace-nowrap">
+                        {formatDuration(durationSeconds(task))}
+                      </span>
+                      <span className="flex gap-2 justify-end">
+                        <button
+                          data-testid={`edit-task-${task.id}`}
+                          onClick={() => {
+                            setEditingTask(task)
+                            setFormError(null)
+                          }}
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          data-testid={`delete-task-${task.id}`}
+                          onClick={() => handleDelete(task.id)}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          Delete
+                        </button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Total row */}
+              <div className="mt-2 text-right text-sm text-gray-600" data-testid="total-duration">
+                Total: <span className="font-semibold">{totalDuration(completedTasks)}</span>
+              </div>
+            </>
           )}
         </section>
       </main>
@@ -307,7 +485,10 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
               projectIds: data.projectIds,
             })
           }
-          onCancel={() => { setShowAddForm(false); setFormError(null) }}
+          onCancel={() => {
+            setShowAddForm(false)
+            setFormError(null)
+          }}
           error={formError}
           isPending={createMutation.isPending}
         />
@@ -329,7 +510,10 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
               },
             })
           }
-          onCancel={() => { setEditingTask(null); setFormError(null) }}
+          onCancel={() => {
+            setEditingTask(null)
+            setFormError(null)
+          }}
           error={formError}
           isPending={updateMutation.isPending}
         />

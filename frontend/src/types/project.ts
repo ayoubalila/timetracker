@@ -5,6 +5,7 @@ export interface ProjectResponse {
   color: string | null
   parentId: string | null
   createdAt: string
+  totalSeconds: number
 }
 
 export interface CreateProjectRequest {

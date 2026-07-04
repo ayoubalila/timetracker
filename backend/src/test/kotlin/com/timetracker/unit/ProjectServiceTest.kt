@@ -3,8 +3,10 @@ package com.timetracker.unit
 import com.timetracker.dto.CreateProjectRequest
 import com.timetracker.dto.UpdateProjectRequest
 import com.timetracker.model.Project
+import com.timetracker.model.Task
 import com.timetracker.model.User
 import com.timetracker.repository.ProjectRepository
+import com.timetracker.repository.TaskRepository
 import com.timetracker.repository.UserRepository
 import com.timetracker.service.ProjectService
 import org.junit.jupiter.api.Test
@@ -14,13 +16,16 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.web.server.ResponseStatusException
+import java.time.Instant
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ProjectServiceTest {
     private val projectRepository: ProjectRepository = mock()
+    private val taskRepository: TaskRepository = mock()
     private val userRepository: UserRepository = mock()
-    private val service = ProjectService(projectRepository, userRepository)
+    private val service = ProjectService(projectRepository, taskRepository, userRepository)
 
     private val alice = User(username = "alice", email = "alice@test.com", password = "hashed")
 
@@ -117,14 +122,17 @@ class ProjectServiceTest {
     // ── getById ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `getById returns project`() {
+    fun `getById returns project with totalSeconds`() {
         stubAlice()
         val p = Project(name = "Work", owner = alice)
         whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findDistinctByProjectsIn(setOf(p), alice)).thenReturn(emptyList())
 
         val result = service.getById("alice", p.id)
 
         assertEquals("Work", result.name)
+        assertEquals(0L, result.totalSeconds)
     }
 
     @Test
@@ -203,6 +211,84 @@ class ProjectServiceTest {
         val ex =
             assertThrows<ResponseStatusException> {
                 service.delete("alice", id)
+            }
+        assertEquals(404, ex.statusCode.value())
+    }
+
+    // ── totalSeconds / time aggregation ────────────────────────────────────────
+
+    @Test
+    fun `getById computes totalSeconds from tasks`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice)
+        val now = Instant.now()
+        val task =
+            Task(
+                startTime = now.minusSeconds(3600),
+                endTime = now,
+                owner = alice,
+                projects = mutableSetOf(p),
+            )
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findDistinctByProjectsIn(setOf(p), alice)).thenReturn(listOf(task))
+
+        val result = service.getById("alice", p.id)
+
+        assertTrue(result.totalSeconds >= 3599L)
+    }
+
+    @Test
+    fun `getById includes subproject tasks in totalSeconds`() {
+        stubAlice()
+        val parent = Project(name = "Work", owner = alice)
+        val child = Project(name = "Sub", owner = alice, parent = parent)
+        val now = Instant.now()
+        val task =
+            Task(
+                startTime = now.minusSeconds(1800),
+                endTime = now,
+                owner = alice,
+                projects = mutableSetOf(child),
+            )
+        whenever(projectRepository.findByIdAndOwner(parent.id, alice)).thenReturn(parent)
+        whenever(projectRepository.findByParent(parent)).thenReturn(listOf(child))
+        whenever(projectRepository.findByParent(child)).thenReturn(emptyList())
+        whenever(taskRepository.findDistinctByProjectsIn(setOf(parent, child), alice))
+            .thenReturn(listOf(task))
+
+        val result = service.getById("alice", parent.id)
+
+        assertTrue(result.totalSeconds >= 1799L)
+    }
+
+    // ── getProjectTasks ────────────────────────────────────────────────────────
+
+    @Test
+    fun `getProjectTasks returns tasks for project and subprojects`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice)
+        val now = Instant.now()
+        val task = Task(startTime = now.minusSeconds(60), endTime = now, owner = alice, projects = mutableSetOf(p))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findDistinctByProjectsIn(setOf(p), alice)).thenReturn(listOf(task))
+
+        val result = service.getProjectTasks("alice", p.id)
+
+        assertEquals(1, result.size)
+        assertEquals(task.id, result[0].id)
+    }
+
+    @Test
+    fun `getProjectTasks - not found throws 404`() {
+        stubAlice()
+        val id = UUID.randomUUID()
+        whenever(projectRepository.findByIdAndOwner(id, alice)).thenReturn(null)
+
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.getProjectTasks("alice", id)
             }
         assertEquals(404, ex.statusCode.value())
     }

@@ -1,9 +1,11 @@
 package com.timetracker.repository
 
+import com.timetracker.model.Project
 import com.timetracker.model.Task
 import com.timetracker.model.User
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import java.time.Instant
 import java.util.UUID
 
@@ -28,5 +30,28 @@ interface TaskRepository : JpaRepository<Task, UUID> {
         owner: User,
         from: Instant,
         to: Instant,
+    ): List<Task>
+
+    @Query(
+        "SELECT DISTINCT t FROM Task t JOIN t.projects p " +
+            "WHERE p IN :projects AND t.owner = :owner " +
+            "ORDER BY t.startTime DESC",
+    )
+    fun findDistinctByProjectsIn(
+        @Param("projects") projects: Collection<Project>,
+        @Param("owner") owner: User,
+    ): List<Task>
+
+    @Query(
+        "SELECT DISTINCT t FROM Task t JOIN t.projects p " +
+            "WHERE p IN :projects AND t.owner = :owner " +
+            "AND t.startTime >= :from AND t.startTime < :to " +
+            "ORDER BY t.startTime DESC",
+    )
+    fun findDistinctByProjectsInAndTimeRange(
+        @Param("projects") projects: Collection<Project>,
+        @Param("owner") owner: User,
+        @Param("from") from: Instant,
+        @Param("to") to: Instant,
     ): List<Task>
 }

@@ -2,13 +2,17 @@ package com.timetracker.service
 
 import com.timetracker.dto.CreateProjectRequest
 import com.timetracker.dto.ProjectResponse
+import com.timetracker.dto.TaskResponse
 import com.timetracker.dto.UpdateProjectRequest
 import com.timetracker.model.Project
+import com.timetracker.model.User
 import com.timetracker.repository.ProjectRepository
+import com.timetracker.repository.TaskRepository
 import com.timetracker.repository.UserRepository
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import java.time.Instant
 import java.util.UUID
 
 private const val MAX_DEPTH = 5
@@ -16,6 +20,7 @@ private const val MAX_DEPTH = 5
 @Service
 class ProjectService(
     private val projectRepository: ProjectRepository,
+    private val taskRepository: TaskRepository,
     private val userRepository: UserRepository,
 ) {
     fun getAll(username: String): List<ProjectResponse> {
@@ -45,9 +50,13 @@ class ProjectService(
     fun getById(
         username: String,
         id: UUID,
+        from: Instant? = null,
+        to: Instant? = null,
     ): ProjectResponse {
         val owner = requireUser(username)
-        return requireProject(id, owner.username).toResponse()
+        val project = requireProject(id, owner.username)
+        val totalSeconds = computeTotalSeconds(project, owner, from, to)
+        return project.toResponse(totalSeconds)
     }
 
     fun update(
@@ -75,11 +84,27 @@ class ProjectService(
         projectRepository.delete(project)
     }
 
+    fun getProjectTasks(
+        username: String,
+        id: UUID,
+        from: Instant? = null,
+        to: Instant? = null,
+    ): List<TaskResponse> {
+        val owner = requireUser(username)
+        val project = requireProject(id, owner.username)
+        val subtree = collectSubtree(project)
+        return if (from != null && to != null) {
+            taskRepository.findDistinctByProjectsInAndTimeRange(subtree, owner, from, to)
+        } else {
+            taskRepository.findDistinctByProjectsIn(subtree, owner)
+        }.map { it.toResponse() }
+    }
+
     // ── helpers ────────────────────────────────────────────────────────────────
 
     private fun requireUser(username: String) =
         userRepository.findByUsername(username)
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found")
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")
 
     private fun requireProject(
         id: UUID,
@@ -129,9 +154,41 @@ class ProjectService(
             throw ResponseStatusException(HttpStatus.CONFLICT, "A project named '$name' already exists at this level")
         }
     }
+
+    private fun collectSubtree(root: Project): Set<Project> {
+        val result = mutableSetOf(root)
+        val queue = ArrayDeque(listOf(root))
+        while (queue.isNotEmpty()) {
+            val current = queue.removeFirst()
+            val children = projectRepository.findByParent(current)
+            result.addAll(children)
+            queue.addAll(children)
+        }
+        return result
+    }
+
+    private fun computeTotalSeconds(
+        project: Project,
+        owner: User,
+        from: Instant?,
+        to: Instant?,
+    ): Long {
+        val subtree = collectSubtree(project)
+        val tasks =
+            if (from != null && to != null) {
+                taskRepository.findDistinctByProjectsInAndTimeRange(subtree, owner, from, to)
+            } else {
+                taskRepository.findDistinctByProjectsIn(subtree, owner)
+            }
+        val now = Instant.now()
+        return tasks.sumOf { task ->
+            val end = task.endTime ?: now
+            (end.epochSecond - task.startTime.epochSecond).coerceAtLeast(0)
+        }
+    }
 }
 
-fun Project.toResponse(): ProjectResponse =
+fun Project.toResponse(totalSeconds: Long = 0): ProjectResponse =
     ProjectResponse(
         id = id,
         name = name,
@@ -139,4 +196,5 @@ fun Project.toResponse(): ProjectResponse =
         color = color,
         parentId = parent?.id,
         createdAt = createdAt,
+        totalSeconds = totalSeconds,
     )

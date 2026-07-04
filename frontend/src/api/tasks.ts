@@ -47,3 +47,15 @@ export async function updateTask(id: string, req: UpdateTaskRequest): Promise<Ta
 export async function deleteTask(id: string): Promise<void> {
   await apiRequest<void>(`/api/tasks/${id}`, { method: 'DELETE' })
 }
+
+export async function getOverviewDay(): Promise<TaskResponse[]> {
+  return apiRequest<TaskResponse[]>('/api/overview/day')
+}
+
+export async function getOverviewWeek(): Promise<TaskResponse[]> {
+  return apiRequest<TaskResponse[]>('/api/overview/week')
+}
+
+export async function getOverviewMonth(): Promise<TaskResponse[]> {
+  return apiRequest<TaskResponse[]>('/api/overview/month')
+}

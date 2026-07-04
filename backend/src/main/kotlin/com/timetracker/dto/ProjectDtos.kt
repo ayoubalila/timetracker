@@ -29,4 +29,5 @@ data class ProjectResponse(
     val color: String?,
     val parentId: UUID?,
     val createdAt: Instant,
+    val totalSeconds: Long = 0,
 )

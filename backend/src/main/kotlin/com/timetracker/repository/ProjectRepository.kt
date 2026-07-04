@@ -23,4 +23,6 @@ interface ProjectRepository : JpaRepository<Project, UUID> {
         name: String,
         parent: Project,
     ): Boolean
+
+    fun findByParent(parent: Project): List<Project>
 }
