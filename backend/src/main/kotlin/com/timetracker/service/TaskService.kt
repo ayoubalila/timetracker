@@ -131,7 +131,7 @@ class TaskService(
 
     private fun requireUser(username: String): User =
         userRepository.findByUsername(username)
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found")
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")
 
     private fun requireTask(
         username: String,

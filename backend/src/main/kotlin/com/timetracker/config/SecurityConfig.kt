@@ -28,6 +28,8 @@ class SecurityConfig(
                 auth
                     .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login")
                     .permitAll()
+                    .requestMatchers("/error")
+                    .permitAll()
                     .anyRequest()
                     .authenticated()
             }.exceptionHandling { ex ->
