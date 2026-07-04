@@ -68,14 +68,14 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 30 | [US] View tasks for today / this week / this month | feat | Tab UI on dashboard; query by date range |
-| 31 | [US] View all tasks associated with a project | feat | Project detail page with task list |
-| 32 | [US] View total time spent on a project (including subprojects, deduplicated) | feat | Recursive CTE; see PLANNING.md §3 for SQL |
-| 33 | [US] Select a custom time frame for project time summary | feat | Date-range picker in project detail |
-| 34 | Task overview — tabular view (list with columns) | feat | Sortable table: description, project, start, end, duration |
+| 30 | ~~[US] View tasks for today / this week / this month~~ ✅ #30 / PR #26db6b2 | feat | Tab UI on dashboard; query by date range |
+| 31 | ~~[US] View all tasks associated with a project~~ ✅ #31 / PR #26db6b2 | feat | Project detail page with task list |
+| 32 | ~~[US] View total time spent on a project (including subprojects, deduplicated)~~ ✅ #32 / PR #26db6b2 | feat | Recursive CTE; see PLANNING.md §3 for SQL |
+| 33 | ~~[US] Select a custom time frame for project time summary~~ ✅ #33 / PR #26db6b2 | feat | Date-range picker in project detail |
+| 34 | ~~Task overview — tabular view (list with columns)~~ ✅ #34 / PR #26db6b2 | feat | Sortable table: description, project, start, end, duration |
 | 35 | Task overview — calendar-like view (week grid) | feat | Optional but strongly recommended per spec |
-| 36 | Unit tests — OverviewService, time aggregation | test | Edge cases: running task, task in multiple subprojects |
-| 37 | Integration tests — OverviewController, ProjectController#totalTime | test | |
+| 36 | ~~Unit tests — OverviewService, time aggregation~~ ✅ #36 / PR #26db6b2 | test | Edge cases: running task, task in multiple subprojects |
+| 37 | ~~Integration tests — OverviewController, ProjectController#totalTime~~ ✅ #37 / PR #26db6b2 | test | |
 | 38 | E2E test — project total time updates after task add/stop | test | Playwright |
 
 ---
@@ -84,8 +84,8 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 39 | Verify time tracking survives browser close/reopen | test | Running task's startTime persists; client recalculates elapsed time on login |
-| 40 | Verify all data persists across app restart | test | Docker volume for PostgreSQL data |
+| 39 | ~~Verify time tracking survives browser close/reopen~~ ✅ | test | Running task's startTime persists; client recalculates elapsed time on login |
+| 40 | ~~Verify all data persists across app restart~~ ✅ | test | Docker volume for PostgreSQL data |
 
 (These are verification tasks, not new features — confirm with E2E tests.)
 
