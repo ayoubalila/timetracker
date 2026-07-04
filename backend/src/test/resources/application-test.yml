@@ -18,3 +18,6 @@ app:
   jwt:
     secret: dGVzdHNlY3JldGtleXRlc3RzZWNyZXRrZXl0ZXN0c2VjcmV0a2V5dGVzdA==
     expiration-ms: 3600000
+  rate-limit:
+    max-requests: 10000
+    window-ms: 60000
