@@ -521,4 +521,31 @@ describe('DashboardPage', () => {
     await waitFor(() => expect(screen.getByTestId('start-error')).toBeTruthy())
     expect(screen.getByTestId('start-error').textContent).toContain('already running')
   })
+
+  it('Space key opens start form when no task is running', async () => {
+    renderDashboard()
+    await waitFor(() => screen.getByTestId('start-task-button'))
+    fireEvent.keyDown(window, { code: 'Space' })
+    await waitFor(() => expect(screen.getByTestId('start-form')).toBeTruthy())
+  })
+
+  it('Space key does not open start form when start form is already open', async () => {
+    renderDashboard()
+    await waitFor(() => screen.getByTestId('start-task-button'))
+    fireEvent.click(screen.getByTestId('start-task-button'))
+    expect(screen.getByTestId('start-form')).toBeTruthy()
+    // second Space press should not duplicate or hide the form
+    fireEvent.keyDown(window, { code: 'Space' })
+    expect(screen.getByTestId('start-form')).toBeTruthy()
+  })
+
+  it('Space key does not trigger when focus is on an input', async () => {
+    renderDashboard()
+    await waitFor(() => screen.getByTestId('start-task-button'))
+    fireEvent.click(screen.getByTestId('start-task-button'))
+    const input = screen.getByTestId('start-description')
+    fireEvent.keyDown(input, { code: 'Space' })
+    // form stays open — no unintended action
+    expect(screen.getByTestId('start-form')).toBeTruthy()
+  })
 })

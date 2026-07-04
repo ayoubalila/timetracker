@@ -98,8 +98,8 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 | 41 | ~~Input validation — all controller endpoints~~ ✅ | feat | Bean Validation annotations, globalExceptionHandler returning RFC 7807 errors |
 | 42 | ~~CORS configuration~~ ✅ | feat | Allow frontend origin only |
 | 43 | ~~Rate limiting on auth endpoints~~ ✅ | feat | Simple in-memory bucket or Spring filter |
-| 44 | Improve frontend error handling (toasts for API errors) | feat | |
-| 45 | Keyboard shortcuts for start/stop (usability) | feat | Spec says "few interactions" — spacebar or similar |
+| 44 | ~~Improve frontend error handling (toasts for API errors)~~ ✅ | feat | |
+| 45 | ~~Keyboard shortcuts for start/stop (usability)~~ ✅ | feat | Spec says "few interactions" — spacebar or similar |
 | 46 | Achieve 90% line coverage — backend gap analysis & fill | test | Run Jacoco, add missing tests |
 | 47 | Achieve 90% line coverage — frontend gap analysis & fill | test | Run Vitest coverage, add missing tests |
 | 48 | Mutation testing baseline (Pitest) | test | Identify surviving mutants, improve assertions |

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { LiveTimer } from '../components/LiveTimer'
@@ -18,6 +18,7 @@ import {
 import { listProjects } from '../api/projects'
 import { logoutApi } from '../api/auth'
 import { ApiError } from '../api/client'
+import { toast } from '../lib/toast'
 import type { TaskResponse } from '../types/task'
 
 type Tab = 'all' | 'day' | 'week' | 'month'
@@ -172,6 +173,7 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
       queryClient.invalidateQueries({ queryKey: ['overview-week'] })
       queryClient.invalidateQueries({ queryKey: ['overview-month'] })
     },
+    onError: (err: Error) => toast(err.message || 'Failed to stop task'),
   })
 
   const createMutation = useMutation({
@@ -210,7 +212,24 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
       queryClient.invalidateQueries({ queryKey: ['overview-week'] })
       queryClient.invalidateQueries({ queryKey: ['overview-month'] })
     },
+    onError: (err: Error) => toast(err.message || 'Failed to delete task'),
   })
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.code === 'Space') {
+        e.preventDefault()
+        if (currentTask) {
+          stopMutation.mutate(currentTask.id)
+        } else if (!showStartForm) {
+          setShowStartForm(true)
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [currentTask, showStartForm, stopMutation])
 
   function handleLogout() {
     logoutApi()
