@@ -110,13 +110,13 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 49 | Flyway V5 — `project_member` table | chore | Columns: `project_id` FK, `user_id` FK, `role` VARCHAR(20); UNIQUE (project_id, user_id) |
-| 50 | [US] Invite a registered user to a project | feat | `POST /api/projects/{id}/members`; owner-only; 404 if username not found; 409 if already member |
-| 51 | [US] View and remove project members | feat | `GET /api/projects/{id}/members`; `DELETE /api/projects/{id}/members/{userId}`; owner-only remove |
-| 52 | [US] Shared project appears in invitee's project list | feat | `ProjectService.getAll()` returns owned + member projects; read-only unless owner |
-| 53 | [US] Project members can add tasks to a shared project | feat | Membership check (owner OR member) in task creation; scoped by project access not user ownership |
-| 54 | Unit tests — ProjectService sharing | test | Cover invite, remove, access check, non-member rejection |
-| 55 | Integration tests — ProjectController sharing | test | MockMvc, H2; include auth for both owner and member tokens |
+| 49 | ~~Flyway V5 — `project_member` table~~ ✅ | chore | Columns: `project_id` FK, `user_id` FK, `role` VARCHAR(20); UNIQUE (project_id, user_id) |
+| 50 | ~~[US] Invite a registered user to a project~~ ✅ | feat | `POST /api/projects/{id}/members`; owner-only; 404 if username not found; 409 if already member |
+| 51 | ~~[US] View and remove project members~~ ✅ | feat | `GET /api/projects/{id}/members`; `DELETE /api/projects/{id}/members/{userId}`; owner-only remove |
+| 52 | ~~[US] Shared project appears in invitee's project list~~ ✅ | feat | `ProjectService.getAll()` returns owned + member projects; read-only unless owner |
+| 53 | ~~[US] Project members can add tasks to a shared project~~ ✅ | feat | Membership check (owner OR member) in task creation; scoped by project access not user ownership |
+| 54 | ~~Unit tests — ProjectService sharing~~ ✅ | test | Cover invite, remove, access check, non-member rejection |
+| 55 | ~~Integration tests — ProjectController sharing~~ ✅ | test | MockMvc, H2; include auth for both owner and member tokens |
 
 ---
 
