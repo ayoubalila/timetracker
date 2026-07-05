@@ -135,10 +135,10 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 60 | [US] Export project tasks for a specific month as CSV | feat | `GET /api/projects/{id}/export?month=2026-07`; includes subproject tasks |
-| 61 | [US] Export all project tasks (no date filter) | feat | Same endpoint without `month` param; streaming for large datasets |
-| 62 | Export format: CSV columns | feat | Columns: `username`, `project_path`, `description`, `start_time`, `end_time`, `duration_seconds` |
-| 63 | Unit + integration tests — export endpoint | test | Verify CSV structure, month filtering, subproject inclusion |
+| 60 | [US] Export project tasks for a specific month as CSV | feat | `GET /api/projects/{id}/export?month=2026-07`; includes subproject tasks | ✅ |
+| 61 | [US] Export all project tasks (no date filter) | feat | Same endpoint without `month` param; streaming for large datasets | ✅ |
+| 62 | Export format: CSV columns | feat | Columns: `username`, `project_path`, `description`, `start_time`, `end_time`, `duration_seconds` | ✅ |
+| 63 | Unit + integration tests — export endpoint | test | Verify CSV structure, month filtering, subproject inclusion | ✅ |
 
 ---
 
