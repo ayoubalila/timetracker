@@ -124,10 +124,10 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 56 | [US] Project task list shows all members' tasks | feat | `GET /api/projects/{id}/tasks` returns tasks from all participating users |
-| 57 | [US] Filter project task list by user | feat | `?userId=` query param on project tasks endpoint; member-only access |
-| 58 | [US] Per-user time breakdown on project detail | feat | Frontend renders time totals per user alongside project total |
-| 59 | Unit + integration tests — shared task overview | test | |
+| 56 | ~~[US] Project task list shows all members' tasks~~ ✅ | feat | `GET /api/projects/{id}/tasks` returns tasks from all participating users |
+| 57 | ~~[US] Filter project task list by user~~ ✅ | feat | `?userId=` query param on project tasks endpoint; member-only access |
+| 58 | ~~[US] Per-user time breakdown on project detail~~ ✅ | feat | Frontend renders time totals per user alongside project total |
+| 59 | ~~Unit + integration tests — shared task overview~~ ✅ | test | |
 
 ---
 
