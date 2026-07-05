@@ -32,6 +32,12 @@ data class InviteMemberRequest(
     val username: String,
 )
 
+data class UserTimeBreakdown(
+    val userId: UUID,
+    val username: String,
+    val seconds: Long,
+)
+
 data class ProjectResponse(
     val id: UUID,
     val name: String,
@@ -41,6 +47,7 @@ data class ProjectResponse(
     val ownerUsername: String,
     val createdAt: Instant,
     val totalSeconds: Long = 0,
+    val userBreakdown: List<UserTimeBreakdown> = emptyList(),
 )
 
 data class MemberResponse(

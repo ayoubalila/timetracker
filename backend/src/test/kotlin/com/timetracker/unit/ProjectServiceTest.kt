@@ -202,7 +202,7 @@ class ProjectServiceTest {
         val p = Project(name = "Work", owner = alice)
         whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
         whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
-        whenever(taskRepository.findDistinctByProjectsIn(setOf(p), alice)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(emptyList())
 
         val result = service.getById("alice", p.id)
 
@@ -231,7 +231,7 @@ class ProjectServiceTest {
         whenever(projectRepository.findById(p.id)).thenReturn(Optional.of(p))
         whenever(memberRepository.existsByProjectAndUser(p, bob)).thenReturn(true)
         whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
-        whenever(taskRepository.findDistinctByProjectsIn(setOf(p), bob)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(emptyList())
 
         val result = service.getById("bob", p.id)
 
@@ -262,12 +262,12 @@ class ProjectServiceTest {
         val to = now
         whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
         whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
-        whenever(taskRepository.findDistinctByProjectsInAndTimeRange(setOf(p), alice, from, to))
+        whenever(taskRepository.findAllByProjectsInAndTimeRange(setOf(p), from, to))
             .thenReturn(emptyList())
 
         val result = service.getById("alice", p.id, from, to)
 
-        verify(taskRepository).findDistinctByProjectsInAndTimeRange(setOf(p), alice, from, to)
+        verify(taskRepository).findAllByProjectsInAndTimeRange(setOf(p), from, to)
         assertEquals(0L, result.totalSeconds)
     }
 
@@ -279,7 +279,7 @@ class ProjectServiceTest {
         val runningTask = Task(startTime = startTime, endTime = null, owner = alice, projects = mutableSetOf(p))
         whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
         whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
-        whenever(taskRepository.findDistinctByProjectsIn(setOf(p), alice)).thenReturn(listOf(runningTask))
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(runningTask))
 
         val result = service.getById("alice", p.id)
 
@@ -430,7 +430,7 @@ class ProjectServiceTest {
             )
         whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
         whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
-        whenever(taskRepository.findDistinctByProjectsIn(setOf(p), alice)).thenReturn(listOf(task))
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(task))
 
         val result = service.getById("alice", p.id)
 
@@ -453,7 +453,7 @@ class ProjectServiceTest {
         whenever(projectRepository.findByIdAndOwner(parent.id, alice)).thenReturn(parent)
         whenever(projectRepository.findByParent(parent)).thenReturn(listOf(child))
         whenever(projectRepository.findByParent(child)).thenReturn(emptyList())
-        whenever(taskRepository.findDistinctByProjectsIn(setOf(parent, child), alice))
+        whenever(taskRepository.findAllByProjectsIn(setOf(parent, child)))
             .thenReturn(listOf(task))
 
         val result = service.getById("alice", parent.id)
@@ -472,12 +472,12 @@ class ProjectServiceTest {
         val to = now
         whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
         whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
-        whenever(taskRepository.findDistinctByProjectsInAndTimeRange(setOf(p), alice, from, to))
+        whenever(taskRepository.findAllByProjectsInAndTimeRange(setOf(p), from, to))
             .thenReturn(emptyList())
 
         val result = service.getProjectTasks("alice", p.id, from, to)
 
-        verify(taskRepository).findDistinctByProjectsInAndTimeRange(setOf(p), alice, from, to)
+        verify(taskRepository).findAllByProjectsInAndTimeRange(setOf(p), from, to)
         assertEquals(0, result.size)
     }
 
@@ -489,7 +489,7 @@ class ProjectServiceTest {
         val task = Task(startTime = now.minusSeconds(60), endTime = now, owner = alice, projects = mutableSetOf(p))
         whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
         whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
-        whenever(taskRepository.findDistinctByProjectsIn(setOf(p), alice)).thenReturn(listOf(task))
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(task))
 
         val result = service.getProjectTasks("alice", p.id)
 
@@ -517,7 +517,7 @@ class ProjectServiceTest {
         whenever(projectRepository.findById(p.id)).thenReturn(Optional.of(p))
         whenever(memberRepository.existsByProjectAndUser(p, bob)).thenReturn(true)
         whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
-        whenever(taskRepository.findDistinctByProjectsIn(setOf(p), bob)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(emptyList())
 
         val result = service.getProjectTasks("bob", p.id)
 
@@ -685,5 +685,81 @@ class ProjectServiceTest {
                 service.removeMember("bob", p.id, alice.id)
             }
         assertEquals(403, ex.statusCode.value())
+    }
+
+    // ── M7B: shared task overview ──────────────────────────────────────────────
+
+    @Test
+    fun `getProjectTasks returns tasks from all members`() {
+        stubAlice()
+        val p = Project(name = "Shared", owner = alice)
+        val now = Instant.now()
+        val aliceTask = Task(startTime = now.minusSeconds(3600), endTime = now, owner = alice, projects = mutableSetOf(p))
+        val bobTask = Task(startTime = now.minusSeconds(1800), endTime = now, owner = bob, projects = mutableSetOf(p))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(aliceTask, bobTask))
+
+        val result = service.getProjectTasks("alice", p.id)
+
+        assertEquals(2, result.size)
+        assertEquals(setOf(aliceTask.id, bobTask.id), result.map { it.id }.toSet())
+    }
+
+    @Test
+    fun `getProjectTasks filters by userId`() {
+        stubAlice()
+        val p = Project(name = "Shared", owner = alice)
+        val now = Instant.now()
+        val aliceTask = Task(startTime = now.minusSeconds(3600), endTime = now, owner = alice, projects = mutableSetOf(p))
+        val bobTask = Task(startTime = now.minusSeconds(1800), endTime = now, owner = bob, projects = mutableSetOf(p))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(aliceTask, bobTask))
+
+        val result = service.getProjectTasks("alice", p.id, filterUserId = bob.id)
+
+        assertEquals(1, result.size)
+        assertEquals(bobTask.id, result[0].id)
+    }
+
+    @Test
+    fun `getById computes combined totalSeconds from all members`() {
+        stubAlice()
+        val p = Project(name = "Shared", owner = alice)
+        val now = Instant.now()
+        val aliceTask = Task(startTime = now.minusSeconds(3600), endTime = now, owner = alice, projects = mutableSetOf(p))
+        val bobTask = Task(startTime = now.minusSeconds(1800), endTime = now, owner = bob, projects = mutableSetOf(p))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(aliceTask, bobTask))
+
+        val result = service.getById("alice", p.id)
+
+        assertTrue(result.totalSeconds >= 5399L)
+        assertEquals(2, result.userBreakdown.size)
+    }
+
+    @Test
+    fun `getById userBreakdown lists per-user seconds`() {
+        stubAlice()
+        val p = Project(name = "Shared", owner = alice)
+        val now = Instant.now()
+        val aliceTask =
+            Task(
+                startTime = now.minusSeconds(3600),
+                endTime = now,
+                owner = alice,
+                projects = mutableSetOf(p),
+            )
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(aliceTask))
+
+        val result = service.getById("alice", p.id)
+
+        assertEquals(1, result.userBreakdown.size)
+        assertEquals("alice", result.userBreakdown[0].username)
+        assertTrue(result.userBreakdown[0].seconds >= 3599L)
     }
 }

@@ -54,4 +54,25 @@ interface TaskRepository : JpaRepository<Task, UUID> {
         @Param("from") from: Instant,
         @Param("to") to: Instant,
     ): List<Task>
+
+    @Query(
+        "SELECT DISTINCT t FROM Task t JOIN t.projects p " +
+            "WHERE p IN :projects " +
+            "ORDER BY t.startTime DESC",
+    )
+    fun findAllByProjectsIn(
+        @Param("projects") projects: Collection<Project>,
+    ): List<Task>
+
+    @Query(
+        "SELECT DISTINCT t FROM Task t JOIN t.projects p " +
+            "WHERE p IN :projects " +
+            "AND t.startTime >= :from AND t.startTime < :to " +
+            "ORDER BY t.startTime DESC",
+    )
+    fun findAllByProjectsInAndTimeRange(
+        @Param("projects") projects: Collection<Project>,
+        @Param("from") from: Instant,
+        @Param("to") to: Instant,
+    ): List<Task>
 }

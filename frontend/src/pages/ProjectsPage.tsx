@@ -431,6 +431,18 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                   </span>
                 </div>
 
+                {/* Per-user breakdown (shared projects) */}
+                {selectedDetail && Array.isArray(selectedDetail.userBreakdown) && selectedDetail.userBreakdown.length > 1 && (
+                  <div className="mt-2" data-testid="user-breakdown">
+                    {selectedDetail.userBreakdown.map((u) => (
+                      <div key={u.userId} className="text-xs text-gray-500 flex justify-between" data-testid={`breakdown-${u.username}`}>
+                        <span>{u.username}</span>
+                        <span>{formatDuration(u.seconds)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Date range filter */}
                 <div className="mt-4 flex items-end gap-3 flex-wrap">
                   <div>
@@ -602,7 +614,14 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                           data-testid={`proj-task-${task.id}`}
                           className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-3 border-b last:border-0 text-sm items-center"
                         >
-                          <span className="truncate">{task.description || '(no description)'}</span>
+                          <span className="truncate">
+                            {task.description || '(no description)'}
+                            {task.ownerUsername !== username && (
+                              <span className="ml-2 text-xs text-gray-400" data-testid={`task-owner-${task.id}`}>
+                                by {task.ownerUsername}
+                              </span>
+                            )}
+                          </span>
                           <span className="text-gray-500 text-right whitespace-nowrap">
                             {formatTime(task.startTime)}
                           </span>

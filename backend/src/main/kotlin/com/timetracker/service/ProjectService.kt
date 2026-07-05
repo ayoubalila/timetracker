@@ -6,6 +6,7 @@ import com.timetracker.dto.MemberResponse
 import com.timetracker.dto.ProjectResponse
 import com.timetracker.dto.TaskResponse
 import com.timetracker.dto.UpdateProjectRequest
+import com.timetracker.dto.UserTimeBreakdown
 import com.timetracker.model.Project
 import com.timetracker.model.ProjectMember
 import com.timetracker.model.User
@@ -62,8 +63,8 @@ class ProjectService(
     ): ProjectResponse {
         val user = requireUser(username)
         val project = requireProjectAccess(id, user)
-        val totalSeconds = computeTotalSeconds(project, user, from, to)
-        return project.toResponse(totalSeconds)
+        val (totalSeconds, userBreakdown) = computeAggregation(project, from, to)
+        return project.toResponse(totalSeconds, userBreakdown)
     }
 
     fun update(
@@ -96,15 +97,20 @@ class ProjectService(
         id: UUID,
         from: Instant? = null,
         to: Instant? = null,
+        filterUserId: UUID? = null,
     ): List<TaskResponse> {
         val user = requireUser(username)
         val project = requireProjectAccess(id, user)
         val subtree = collectSubtree(project)
-        return if (from != null && to != null) {
-            taskRepository.findDistinctByProjectsInAndTimeRange(subtree, user, from, to)
-        } else {
-            taskRepository.findDistinctByProjectsIn(subtree, user)
-        }.map { it.toResponse() }
+        val tasks =
+            if (from != null && to != null) {
+                taskRepository.findAllByProjectsInAndTimeRange(subtree, from, to)
+            } else {
+                taskRepository.findAllByProjectsIn(subtree)
+            }
+        return tasks
+            .let { list -> if (filterUserId != null) list.filter { it.owner.id == filterUserId } else list }
+            .map { it.toResponse() }
     }
 
     fun getMembers(
@@ -236,28 +242,37 @@ class ProjectService(
         return result
     }
 
-    private fun computeTotalSeconds(
+    private fun computeAggregation(
         project: Project,
-        owner: User,
         from: Instant?,
         to: Instant?,
-    ): Long {
+    ): Pair<Long, List<UserTimeBreakdown>> {
         val subtree = collectSubtree(project)
         val tasks =
             if (from != null && to != null) {
-                taskRepository.findDistinctByProjectsInAndTimeRange(subtree, owner, from, to)
+                taskRepository.findAllByProjectsInAndTimeRange(subtree, from, to)
             } else {
-                taskRepository.findDistinctByProjectsIn(subtree, owner)
+                taskRepository.findAllByProjectsIn(subtree)
             }
         val now = Instant.now()
-        return tasks.sumOf { task ->
-            val end = task.endTime ?: now
-            (end.epochSecond - task.startTime.epochSecond).coerceAtLeast(0)
-        }
+        val byUser = tasks.groupBy { it.owner }
+        val breakdown =
+            byUser.entries.map { (taskOwner, userTasks) ->
+                val secs =
+                    userTasks.sumOf { task ->
+                        val end = task.endTime ?: now
+                        (end.epochSecond - task.startTime.epochSecond).coerceAtLeast(0)
+                    }
+                UserTimeBreakdown(userId = taskOwner.id, username = taskOwner.username, seconds = secs)
+            }
+        return Pair(breakdown.sumOf { it.seconds }, breakdown)
     }
 }
 
-fun Project.toResponse(totalSeconds: Long = 0): ProjectResponse =
+fun Project.toResponse(
+    totalSeconds: Long = 0,
+    userBreakdown: List<UserTimeBreakdown> = emptyList(),
+): ProjectResponse =
     ProjectResponse(
         id = id,
         name = name,
@@ -267,6 +282,7 @@ fun Project.toResponse(totalSeconds: Long = 0): ProjectResponse =
         ownerUsername = owner.username,
         createdAt = createdAt,
         totalSeconds = totalSeconds,
+        userBreakdown = userBreakdown,
     )
 
 fun ProjectMember.toMemberResponse(): MemberResponse =

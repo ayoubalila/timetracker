@@ -1,3 +1,9 @@
+export interface UserTimeBreakdown {
+  userId: string
+  username: string
+  seconds: number
+}
+
 export interface ProjectResponse {
   id: string
   name: string
@@ -7,6 +13,7 @@ export interface ProjectResponse {
   ownerUsername: string
   createdAt: string
   totalSeconds: number
+  userBreakdown: UserTimeBreakdown[]
 }
 
 export interface MemberResponse {

@@ -173,6 +173,7 @@ fun Task.toResponse(): TaskResponse =
         startTime = startTime,
         endTime = endTime,
         projectIds = projects.map { it.id },
+        ownerUsername = owner.username,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

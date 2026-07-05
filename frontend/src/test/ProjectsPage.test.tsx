@@ -21,6 +21,7 @@ const project: ProjectResponse = {
   ownerUsername: 'alice',
   createdAt: '2026-06-24T00:00:00Z',
   totalSeconds: 0,
+  userBreakdown: [],
 }
 
 function setup() {
@@ -312,6 +313,7 @@ describe('ProjectsPage', () => {
     startTime: '2026-06-29T08:00:00Z',
     endTime: '2026-06-29T09:00:00Z',
     projectIds: ['1'],
+    ownerUsername: 'alice',
     createdAt: '2026-06-29T08:00:00Z',
     updatedAt: '2026-06-29T09:00:00Z',
   }
@@ -321,6 +323,7 @@ describe('ProjectsPage', () => {
     startTime: '2026-06-29T10:00:00Z',
     endTime: null,
     projectIds: ['1'],
+    ownerUsername: 'alice',
     createdAt: '2026-06-29T10:00:00Z',
     updatedAt: '2026-06-29T10:00:00Z',
   }

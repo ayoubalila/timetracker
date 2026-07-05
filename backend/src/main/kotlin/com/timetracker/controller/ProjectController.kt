@@ -56,7 +56,8 @@ class ProjectController(
         @PathVariable id: UUID,
         @RequestParam(required = false) from: Instant?,
         @RequestParam(required = false) to: Instant?,
-    ): ResponseEntity<List<TaskResponse>> = ResponseEntity.ok(projectService.getProjectTasks(username, id, from, to))
+        @RequestParam(required = false) userId: UUID?,
+    ): ResponseEntity<List<TaskResponse>> = ResponseEntity.ok(projectService.getProjectTasks(username, id, from, to, userId))
 
     @PutMapping("/{id}")
     fun update(

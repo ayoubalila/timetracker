@@ -28,6 +28,7 @@ class OverviewServiceTest {
             startTime = Instant.now().minusSeconds(60),
             endTime = Instant.now(),
             projectIds = emptyList(),
+            ownerUsername = "alice",
             createdAt = Instant.now(),
             updatedAt = Instant.now(),
         )

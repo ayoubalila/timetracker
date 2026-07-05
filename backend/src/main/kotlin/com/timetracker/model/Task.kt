@@ -23,7 +23,7 @@ class Task(
     @Column(nullable = false)
     var startTime: Instant,
     var endTime: Instant? = null,
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "owner_id", nullable = false)
     val owner: User,
     @ManyToMany(fetch = FetchType.LAZY)

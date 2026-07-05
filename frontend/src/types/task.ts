@@ -4,6 +4,7 @@ export interface TaskResponse {
   startTime: string
   endTime: string | null
   projectIds: string[]
+  ownerUsername: string
   createdAt: string
   updatedAt: string
 }

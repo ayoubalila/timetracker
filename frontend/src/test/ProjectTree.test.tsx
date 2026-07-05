@@ -9,7 +9,10 @@ const root: ProjectResponse = {
   description: null,
   color: null,
   parentId: null,
+  ownerUsername: 'alice',
   createdAt: '2026-06-24T00:00:00Z',
+  totalSeconds: 0,
+  userBreakdown: [],
 }
 
 const child: ProjectResponse = {
@@ -18,7 +21,10 @@ const child: ProjectResponse = {
   description: null,
   color: '#ff0000',
   parentId: '1',
+  ownerUsername: 'alice',
   createdAt: '2026-06-24T00:00:00Z',
+  totalSeconds: 0,
+  userBreakdown: [],
 }
 
 describe('ProjectTree', () => {

@@ -587,7 +587,7 @@ class ProjectControllerTest {
     }
 
     @Test
-    fun `GET projects id tasks - 200 for member (sees own tasks only)`() {
+    fun `GET projects id tasks - 200 for member`() {
         val aliceToken = registerAndGetToken("alice")
         val bobToken = registerAndGetToken("bob")
         val id = createProject(aliceToken, "Work")
@@ -714,6 +714,173 @@ class ProjectControllerTest {
             .andExpect {
                 status { isOk() }
                 jsonPath("$.ownerUsername") { value("alice") }
+            }
+    }
+
+    // ── M7B: shared project task overview ─────────────────────────────────────
+
+    @Test
+    fun `GET project tasks shows owner and member tasks combined`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        val now = Instant.now()
+        // Alice adds a task
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Alice task",
+                            startTime = now.minusSeconds(3600),
+                            endTime = now.minusSeconds(1800),
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+        // Bob adds a task
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $bobToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Bob task",
+                            startTime = now.minusSeconds(900),
+                            endTime = now,
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        mockMvc
+            .get("/api/projects/$id/tasks") { header("Authorization", "Bearer $aliceToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(2) }
+            }
+    }
+
+    @Test
+    fun `GET project tasks with userId filter returns only that user's tasks`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        val now = Instant.now()
+        // Alice adds a task
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Alice task",
+                            startTime = now.minusSeconds(3600),
+                            endTime = now.minusSeconds(1800),
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+        // Bob adds a task
+        val bobUserId =
+            objectMapper
+                .readTree(
+                    mockMvc
+                        .post("/api/tasks") {
+                            header("Authorization", "Bearer $bobToken")
+                            contentType = MediaType.APPLICATION_JSON
+                            content =
+                                objectMapper.writeValueAsString(
+                                    CreateTaskRequest(
+                                        description = "Bob task",
+                                        startTime = now.minusSeconds(900),
+                                        endTime = now,
+                                        projectIds = listOf(id),
+                                    ),
+                                )
+                        }.andExpect { status { isCreated() } }
+                        .andReturn()
+                        .response.contentAsString,
+                ).let {
+                    // Get Bob's userId from his task's ownerUsername — use members endpoint instead
+                    memberRepository
+                        .findAll()
+                        .first { m -> m.user.username == "bob" }
+                        .user.id
+                }
+
+        mockMvc
+            .get("/api/projects/$id/tasks?userId=$bobUserId") { header("Authorization", "Bearer $aliceToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(1) }
+                jsonPath("$[0].description") { value("Bob task") }
+            }
+    }
+
+    @Test
+    fun `GET project tasks response includes ownerUsername`() {
+        val aliceToken = registerAndGetToken("alice")
+        val id = createProject(aliceToken, "Work")
+        val now = Instant.now()
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "My task",
+                            startTime = now.minusSeconds(3600),
+                            endTime = now,
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        mockMvc
+            .get("/api/projects/$id/tasks") { header("Authorization", "Bearer $aliceToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[0].ownerUsername") { value("alice") }
+            }
+    }
+
+    @Test
+    fun `GET project by id includes userBreakdown`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        val now = Instant.now()
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Alice task",
+                            startTime = now.minusSeconds(3600),
+                            endTime = now,
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        mockMvc
+            .get("/api/projects/$id") { header("Authorization", "Bearer $aliceToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.userBreakdown") { isArray() }
+                jsonPath("$.userBreakdown.length()") { value(1) }
+                jsonPath("$.userBreakdown[0].username") { value("alice") }
             }
     }
 }

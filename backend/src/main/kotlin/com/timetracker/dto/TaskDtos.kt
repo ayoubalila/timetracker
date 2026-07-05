@@ -30,6 +30,7 @@ data class TaskResponse(
     val startTime: Instant,
     val endTime: Instant?,
     val projectIds: List<UUID>,
+    val ownerUsername: String,
     val createdAt: Instant,
     val updatedAt: Instant,
 )

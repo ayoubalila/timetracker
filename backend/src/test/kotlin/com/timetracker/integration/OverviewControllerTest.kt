@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.temporal.TemporalAdjusters
 
@@ -83,8 +84,8 @@ class OverviewControllerTest {
     @Test
     fun `GET overview-day - 200 returns today's tasks`() {
         val token = registerAndGetToken()
-        val now = Instant.now()
-        createTask(token, now.minusSeconds(3600), now.minusSeconds(1800))
+        val startOfToday = LocalDate.now(ZoneOffset.UTC).atStartOfDay(ZoneOffset.UTC).toInstant()
+        createTask(token, startOfToday.plusSeconds(3600), startOfToday.plusSeconds(7200))
 
         mockMvc
             .get("/api/overview/day") { header("Authorization", "Bearer $token") }
