@@ -10,6 +10,7 @@ import {
   getProject,
   getProjectTasks,
 } from '../api/projects'
+import { getMembers, inviteMember, removeMember } from '../api/members'
 import { logoutApi } from '../api/auth'
 import { ApiError } from '../api/client'
 import type { ProjectResponse } from '../types/project'
@@ -70,6 +71,8 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
   const [dateTo, setDateTo] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('startTime')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [inviteUsername, setInviteUsername] = useState('')
+  const [inviteError, setInviteError] = useState<string | null>(null)
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects'],
@@ -88,6 +91,12 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
   const { data: projectTasks = [] } = useQuery({
     queryKey: ['project-tasks', selectedProjectId, fromIso, toIso],
     queryFn: () => getProjectTasks(selectedProjectId!, fromIso, toIso),
+    enabled: selectedProjectId !== null,
+  })
+
+  const { data: members = [] } = useQuery({
+    queryKey: ['project-members', selectedProjectId],
+    queryFn: () => getMembers(selectedProjectId!),
     enabled: selectedProjectId !== null,
   })
 
@@ -137,6 +146,25 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
     },
   })
 
+  const inviteMutation = useMutation({
+    mutationFn: ({ projectId, un }: { projectId: string; un: string }) =>
+      inviteMember(projectId, { username: un }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-members', selectedProjectId] })
+      setInviteUsername('')
+      setInviteError(null)
+    },
+    onError: (err: Error) => setInviteError(err.message),
+  })
+
+  const removeMemberMutation = useMutation({
+    mutationFn: ({ projectId, userId }: { projectId: string; userId: string }) =>
+      removeMember(projectId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-members', selectedProjectId] })
+    },
+  })
+
   function handleLogout() {
     logoutApi()
     onLogout()
@@ -179,6 +207,7 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? null
   const displayProject = selectedProject
+  const isOwner = displayProject?.ownerUsername === username
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -343,7 +372,17 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
               {/* Project header */}
               <div className="bg-white rounded-lg border p-6 mb-4">
                 <div className="flex items-start justify-between mb-3">
-                  <h2 className="text-xl font-semibold">{displayProject.name}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-semibold">{displayProject.name}</h2>
+                    {!isOwner && (
+                      <span
+                        className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded"
+                        data-testid="shared-badge"
+                      >
+                        Shared by {displayProject.ownerUsername}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() =>
@@ -356,20 +395,24 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                     >
                       ▶ Start task
                     </button>
-                    <button
-                      onClick={() => startEdit(displayProject)}
-                      className="text-sm text-blue-600 hover:text-blue-800"
-                      data-testid="edit-button"
-                    >
-                      Rename
-                    </button>
-                    <button
-                      onClick={() => handleDelete(displayProject)}
-                      className="text-sm text-red-600 hover:text-red-800"
-                      data-testid="delete-button"
-                    >
-                      Delete
-                    </button>
+                    {isOwner && (
+                      <>
+                        <button
+                          onClick={() => startEdit(displayProject)}
+                          className="text-sm text-blue-600 hover:text-blue-800"
+                          data-testid="edit-button"
+                        >
+                          Rename
+                        </button>
+                        <button
+                          onClick={() => handleDelete(displayProject)}
+                          className="text-sm text-red-600 hover:text-red-800"
+                          data-testid="delete-button"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -421,16 +464,82 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                   )}
                 </div>
 
-                <button
-                  onClick={() => {
-                    setShowCreateForm(true)
-                    setNewParentId(displayProject.id)
-                  }}
-                  className="mt-4 text-sm text-blue-600 hover:text-blue-800"
-                  data-testid="add-subproject-button"
-                >
-                  + Add subproject
-                </button>
+                {isOwner && (
+                  <button
+                    onClick={() => {
+                      setShowCreateForm(true)
+                      setNewParentId(displayProject.id)
+                    }}
+                    className="mt-4 text-sm text-blue-600 hover:text-blue-800"
+                    data-testid="add-subproject-button"
+                  >
+                    + Add subproject
+                  </button>
+                )}
+              </div>
+
+              {/* Members panel */}
+              <div className="bg-white rounded-lg border p-4 mb-4" data-testid="members-panel">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Members</h3>
+                {members.length === 0 ? (
+                  <p className="text-sm text-gray-400" data-testid="members-empty">No members yet.</p>
+                ) : (
+                  <ul className="space-y-1 mb-3" data-testid="members-list">
+                    {members.map((m) => (
+                      <li key={m.userId} className="flex items-center justify-between text-sm">
+                        <span data-testid={`member-${m.username}`}>{m.username}</span>
+                        {isOwner && (
+                          <button
+                            onClick={() =>
+                              removeMemberMutation.mutate({
+                                projectId: displayProject.id,
+                                userId: m.userId,
+                              })
+                            }
+                            className="text-xs text-red-500 hover:text-red-700"
+                            data-testid={`remove-member-${m.username}`}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {isOwner && (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      if (inviteUsername.trim()) {
+                        inviteMutation.mutate({ projectId: displayProject.id, un: inviteUsername.trim() })
+                      }
+                    }}
+                    className="flex gap-2 mt-2"
+                    data-testid="invite-form"
+                  >
+                    <input
+                      type="text"
+                      placeholder="Username to invite"
+                      value={inviteUsername}
+                      onChange={(e) => setInviteUsername(e.target.value)}
+                      className="flex-1 border rounded px-2 py-1 text-sm"
+                      data-testid="invite-username-input"
+                    />
+                    <button
+                      type="submit"
+                      disabled={inviteMutation.isPending}
+                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
+                      data-testid="invite-submit"
+                    >
+                      Invite
+                    </button>
+                  </form>
+                )}
+                {inviteError && (
+                  <p className="text-red-600 text-xs mt-1" data-testid="invite-error">
+                    {inviteError}
+                  </p>
+                )}
               </div>
 
               {/* Task list */}

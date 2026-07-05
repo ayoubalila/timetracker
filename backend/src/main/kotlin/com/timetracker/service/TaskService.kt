@@ -7,6 +7,7 @@ import com.timetracker.dto.UpdateTaskRequest
 import com.timetracker.model.Project
 import com.timetracker.model.Task
 import com.timetracker.model.User
+import com.timetracker.repository.ProjectMemberRepository
 import com.timetracker.repository.ProjectRepository
 import com.timetracker.repository.TaskRepository
 import com.timetracker.repository.UserRepository
@@ -21,6 +22,7 @@ class TaskService(
     private val taskRepository: TaskRepository,
     private val projectRepository: ProjectRepository,
     private val userRepository: UserRepository,
+    private val memberRepository: ProjectMemberRepository,
 ) {
     fun listAll(
         username: String,
@@ -144,13 +146,22 @@ class TaskService(
 
     private fun resolveProjects(
         projectIds: List<UUID>,
-        owner: User,
+        requester: User,
     ): MutableSet<Project> {
         if (projectIds.isEmpty()) return mutableSetOf()
         return projectIds
             .map { pid ->
-                projectRepository.findByIdAndOwner(pid, owner)
-                    ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project $pid not found")
+                // Fast path: owned project
+                val owned = projectRepository.findByIdAndOwner(pid, requester)
+                if (owned != null) return@map owned
+                // Member can also associate tasks with a shared project
+                val project =
+                    projectRepository.findById(pid).orElse(null)
+                        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project $pid not found")
+                if (!memberRepository.existsByProjectAndUser(project, requester)) {
+                    throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project $pid not found")
+                }
+                project
             }.toMutableSet()
     }
 }

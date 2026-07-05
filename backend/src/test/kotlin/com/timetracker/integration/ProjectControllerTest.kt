@@ -3,8 +3,10 @@ package com.timetracker.integration
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.timetracker.dto.CreateProjectRequest
 import com.timetracker.dto.CreateTaskRequest
+import com.timetracker.dto.InviteMemberRequest
 import com.timetracker.dto.RegisterRequest
 import com.timetracker.dto.UpdateProjectRequest
+import com.timetracker.repository.ProjectMemberRepository
 import com.timetracker.repository.ProjectRepository
 import com.timetracker.repository.TaskRepository
 import com.timetracker.repository.UserRepository
@@ -37,9 +39,12 @@ class ProjectControllerTest {
 
     @Autowired lateinit var taskRepository: TaskRepository
 
+    @Autowired lateinit var memberRepository: ProjectMemberRepository
+
     @BeforeEach
     fun cleanDb() {
         taskRepository.deleteAll()
+        memberRepository.deleteAll()
         projectRepository.deleteAll()
         userRepository.deleteAll()
     }
@@ -367,5 +372,348 @@ class ProjectControllerTest {
         mockMvc
             .get("/api/projects/$id/tasks") { header("Authorization", "Bearer $bobToken") }
             .andExpect { status { isNotFound() } }
+    }
+
+    // ── project sharing — invite / remove ─────────────────────────────────────
+
+    private fun inviteUser(
+        ownerToken: String,
+        projectId: UUID,
+        inviteeUsername: String,
+    ) {
+        mockMvc
+            .post("/api/projects/$projectId/members") {
+                header("Authorization", "Bearer $ownerToken")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(InviteMemberRequest(username = inviteeUsername))
+            }.andExpect { status { isCreated() } }
+    }
+
+    @Test
+    fun `POST projects-members - 201 invites member`() {
+        val aliceToken = registerAndGetToken("alice")
+        registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        mockMvc
+            .post("/api/projects/$id/members") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(InviteMemberRequest(username = "bob"))
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.username") { value("bob") }
+                jsonPath("$.role") { value("MEMBER") }
+            }
+    }
+
+    @Test
+    fun `POST projects-members - 404 for unknown invitee`() {
+        val aliceToken = registerAndGetToken("alice")
+        val id = createProject(aliceToken, "Work")
+        mockMvc
+            .post("/api/projects/$id/members") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(InviteMemberRequest(username = "nobody"))
+            }.andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun `POST projects-members - 409 when already a member`() {
+        val aliceToken = registerAndGetToken("alice")
+        registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        mockMvc
+            .post("/api/projects/$id/members") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(InviteMemberRequest(username = "bob"))
+            }.andExpect { status { isConflict() } }
+    }
+
+    @Test
+    fun `POST projects-members - 400 when inviting self`() {
+        val aliceToken = registerAndGetToken("alice")
+        val id = createProject(aliceToken, "Work")
+        mockMvc
+            .post("/api/projects/$id/members") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(InviteMemberRequest(username = "alice"))
+            }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `POST projects-members - 403 when caller is member not owner`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        registerAndGetToken("carol")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        mockMvc
+            .post("/api/projects/$id/members") {
+                header("Authorization", "Bearer $bobToken")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(InviteMemberRequest(username = "carol"))
+            }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `POST projects-members - 404 when caller has no access`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        registerAndGetToken("carol")
+        val id = createProject(aliceToken, "Work")
+        mockMvc
+            .post("/api/projects/$id/members") {
+                header("Authorization", "Bearer $bobToken")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(InviteMemberRequest(username = "carol"))
+            }.andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun `GET projects-members - 200 returns member list`() {
+        val aliceToken = registerAndGetToken("alice")
+        registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        mockMvc
+            .get("/api/projects/$id/members") { header("Authorization", "Bearer $aliceToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(1) }
+                jsonPath("$[0].username") { value("bob") }
+            }
+    }
+
+    @Test
+    fun `GET projects-members - 200 member can view member list`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        mockMvc
+            .get("/api/projects/$id/members") { header("Authorization", "Bearer $bobToken") }
+            .andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `GET projects-members - 404 for non-member`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        mockMvc
+            .get("/api/projects/$id/members") { header("Authorization", "Bearer $bobToken") }
+            .andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun `DELETE projects-members - 204 removes member`() {
+        val aliceToken = registerAndGetToken("alice")
+        registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        val bobUser = userRepository.findByUsername("bob")!!
+        mockMvc
+            .delete("/api/projects/$id/members/${bobUser.id}") {
+                header("Authorization", "Bearer $aliceToken")
+            }.andExpect { status { isNoContent() } }
+
+        mockMvc
+            .get("/api/projects/$id/members") { header("Authorization", "Bearer $aliceToken") }
+            .andExpect { jsonPath("$.length()") { value(0) } }
+    }
+
+    @Test
+    fun `DELETE projects-members - 403 when member tries to remove`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        registerAndGetToken("carol")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        inviteUser(aliceToken, id, "carol")
+        val carolUser = userRepository.findByUsername("carol")!!
+        mockMvc
+            .delete("/api/projects/$id/members/${carolUser.id}") {
+                header("Authorization", "Bearer $bobToken")
+            }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `DELETE projects-members - 404 when target user is not a member`() {
+        val aliceToken = registerAndGetToken("alice")
+        registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        val bobUser = userRepository.findByUsername("bob")!!
+        mockMvc
+            .delete("/api/projects/$id/members/${bobUser.id}") {
+                header("Authorization", "Bearer $aliceToken")
+            }.andExpect { status { isNotFound() } }
+    }
+
+    // ── shared project access ─────────────────────────────────────────────────
+
+    @Test
+    fun `GET projects - shared project appears in member project list`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Alice Work")
+        inviteUser(aliceToken, id, "bob")
+        mockMvc
+            .get("/api/projects") { header("Authorization", "Bearer $bobToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(1) }
+                jsonPath("$[0].name") { value("Alice Work") }
+                jsonPath("$[0].ownerUsername") { value("alice") }
+            }
+    }
+
+    @Test
+    fun `GET projects id - 200 for member`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        mockMvc
+            .get("/api/projects/$id") { header("Authorization", "Bearer $bobToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.name") { value("Work") }
+                jsonPath("$.ownerUsername") { value("alice") }
+            }
+    }
+
+    @Test
+    fun `GET projects id tasks - 200 for member (sees own tasks only)`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        val now = Instant.now()
+        // Bob adds a task to Alice's project
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $bobToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Bob's task",
+                            startTime = now.minusSeconds(600),
+                            endTime = now,
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        mockMvc
+            .get("/api/projects/$id/tasks") { header("Authorization", "Bearer $bobToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(1) }
+                jsonPath("$[0].description") { value("Bob's task") }
+            }
+    }
+
+    @Test
+    fun `PUT projects id - 403 when member tries to rename`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        mockMvc
+            .put("/api/projects/$id") {
+                header("Authorization", "Bearer $bobToken")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(UpdateProjectRequest(name = "Renamed"))
+            }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `DELETE projects id - 403 when member tries to delete`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        mockMvc
+            .delete("/api/projects/$id") { header("Authorization", "Bearer $bobToken") }
+            .andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `POST projects - 403 when member tries to add subproject`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        mockMvc
+            .post("/api/projects") {
+                header("Authorization", "Bearer $bobToken")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(CreateProjectRequest(name = "Sub", parentId = id))
+            }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `POST tasks - member can associate task with shared project`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        val now = Instant.now()
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $bobToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Bob's contribution",
+                            startTime = now.minusSeconds(1800),
+                            endTime = now,
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.projectIds[0]") { value(id.toString()) }
+            }
+    }
+
+    @Test
+    fun `POST tasks - non-member cannot associate task with project`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        val now = Instant.now()
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $bobToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Unauthorized",
+                            startTime = now.minusSeconds(1800),
+                            endTime = now,
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun `ownerUsername is included in project response`() {
+        val token = registerAndGetToken("alice")
+        val id = createProject(token, "My Project")
+        mockMvc
+            .get("/api/projects/$id") { header("Authorization", "Bearer $token") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.ownerUsername") { value("alice") }
+            }
     }
 }

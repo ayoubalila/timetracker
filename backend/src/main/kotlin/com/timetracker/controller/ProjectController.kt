@@ -1,6 +1,8 @@
 package com.timetracker.controller
 
 import com.timetracker.dto.CreateProjectRequest
+import com.timetracker.dto.InviteMemberRequest
+import com.timetracker.dto.MemberResponse
 import com.timetracker.dto.ProjectResponse
 import com.timetracker.dto.TaskResponse
 import com.timetracker.dto.UpdateProjectRequest
@@ -69,6 +71,34 @@ class ProjectController(
         @PathVariable id: UUID,
     ): ResponseEntity<Void> {
         projectService.delete(username, id)
+        return ResponseEntity.noContent().build()
+    }
+
+    // ── member management ──────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/members")
+    fun getMembers(
+        @AuthenticationPrincipal username: String,
+        @PathVariable id: UUID,
+    ): ResponseEntity<List<MemberResponse>> = ResponseEntity.ok(projectService.getMembers(username, id))
+
+    @PostMapping("/{id}/members")
+    fun inviteMember(
+        @AuthenticationPrincipal username: String,
+        @PathVariable id: UUID,
+        @Valid @RequestBody request: InviteMemberRequest,
+    ): ResponseEntity<MemberResponse> =
+        ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(projectService.inviteMember(username, id, request))
+
+    @DeleteMapping("/{id}/members/{userId}")
+    fun removeMember(
+        @AuthenticationPrincipal username: String,
+        @PathVariable id: UUID,
+        @PathVariable userId: UUID,
+    ): ResponseEntity<Void> {
+        projectService.removeMember(username, id, userId)
         return ResponseEntity.noContent().build()
     }
 }

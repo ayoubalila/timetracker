@@ -1,11 +1,15 @@
 package com.timetracker.service
 
 import com.timetracker.dto.CreateProjectRequest
+import com.timetracker.dto.InviteMemberRequest
+import com.timetracker.dto.MemberResponse
 import com.timetracker.dto.ProjectResponse
 import com.timetracker.dto.TaskResponse
 import com.timetracker.dto.UpdateProjectRequest
 import com.timetracker.model.Project
+import com.timetracker.model.ProjectMember
 import com.timetracker.model.User
+import com.timetracker.repository.ProjectMemberRepository
 import com.timetracker.repository.ProjectRepository
 import com.timetracker.repository.TaskRepository
 import com.timetracker.repository.UserRepository
@@ -22,10 +26,13 @@ class ProjectService(
     private val projectRepository: ProjectRepository,
     private val taskRepository: TaskRepository,
     private val userRepository: UserRepository,
+    private val memberRepository: ProjectMemberRepository,
 ) {
     fun getAll(username: String): List<ProjectResponse> {
-        val owner = requireUser(username)
-        return projectRepository.findAllByOwner(owner).map { it.toResponse() }
+        val user = requireUser(username)
+        val owned = projectRepository.findAllByOwner(user)
+        val memberProjects = memberRepository.findAllByUser(user).map { it.project }
+        return (owned + memberProjects).distinctBy { it.id }.map { it.toResponse() }
     }
 
     fun create(
@@ -33,7 +40,7 @@ class ProjectService(
         request: CreateProjectRequest,
     ): ProjectResponse {
         val owner = requireUser(username)
-        val parent = resolveParent(request.parentId, owner.username)
+        val parent = request.parentId?.let { requireProjectOwner(it, owner) }
         checkDepth(parent)
         checkNameUnique(owner.username, request.name, parent)
         val project =
@@ -53,9 +60,9 @@ class ProjectService(
         from: Instant? = null,
         to: Instant? = null,
     ): ProjectResponse {
-        val owner = requireUser(username)
-        val project = requireProject(id, owner.username)
-        val totalSeconds = computeTotalSeconds(project, owner, from, to)
+        val user = requireUser(username)
+        val project = requireProjectAccess(id, user)
+        val totalSeconds = computeTotalSeconds(project, user, from, to)
         return project.toResponse(totalSeconds)
     }
 
@@ -64,10 +71,10 @@ class ProjectService(
         id: UUID,
         request: UpdateProjectRequest,
     ): ProjectResponse {
-        val owner = requireUser(username)
-        val project = requireProject(id, owner.username)
+        val user = requireUser(username)
+        val project = requireProjectOwner(id, user)
         if (project.name != request.name) {
-            checkNameUnique(owner.username, request.name, project.parent)
+            checkNameUnique(user.username, request.name, project.parent)
         }
         project.name = request.name
         project.description = request.description
@@ -79,8 +86,8 @@ class ProjectService(
         username: String,
         id: UUID,
     ) {
-        val owner = requireUser(username)
-        val project = requireProject(id, owner.username)
+        val user = requireUser(username)
+        val project = requireProjectOwner(id, user)
         projectRepository.delete(project)
     }
 
@@ -90,14 +97,58 @@ class ProjectService(
         from: Instant? = null,
         to: Instant? = null,
     ): List<TaskResponse> {
-        val owner = requireUser(username)
-        val project = requireProject(id, owner.username)
+        val user = requireUser(username)
+        val project = requireProjectAccess(id, user)
         val subtree = collectSubtree(project)
         return if (from != null && to != null) {
-            taskRepository.findDistinctByProjectsInAndTimeRange(subtree, owner, from, to)
+            taskRepository.findDistinctByProjectsInAndTimeRange(subtree, user, from, to)
         } else {
-            taskRepository.findDistinctByProjectsIn(subtree, owner)
+            taskRepository.findDistinctByProjectsIn(subtree, user)
         }.map { it.toResponse() }
+    }
+
+    fun getMembers(
+        username: String,
+        id: UUID,
+    ): List<MemberResponse> {
+        val user = requireUser(username)
+        val project = requireProjectAccess(id, user)
+        return memberRepository.findAllByProject(project).map { it.toMemberResponse() }
+    }
+
+    fun inviteMember(
+        username: String,
+        id: UUID,
+        request: InviteMemberRequest,
+    ): MemberResponse {
+        val caller = requireUser(username)
+        val project = requireProjectOwner(id, caller)
+        val invitee =
+            userRepository.findByUsername(request.username)
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User '${request.username}' not found")
+        if (invitee.id == caller.id) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot invite yourself to your own project")
+        }
+        if (memberRepository.existsByProjectAndUser(project, invitee)) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "User is already a member of this project")
+        }
+        return memberRepository.save(ProjectMember(project = project, user = invitee)).toMemberResponse()
+    }
+
+    fun removeMember(
+        username: String,
+        id: UUID,
+        memberUserId: UUID,
+    ) {
+        val caller = requireUser(username)
+        val project = requireProjectOwner(id, caller)
+        val memberUser =
+            userRepository.findById(memberUserId).orElse(null)
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")
+        val membership =
+            memberRepository.findByProjectAndUser(project, memberUser)
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User is not a member of this project")
+        memberRepository.delete(membership)
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────
@@ -106,23 +157,41 @@ class ProjectService(
         userRepository.findByUsername(username)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")
 
-    private fun requireProject(
+    /**
+     * Returns the project when the caller is the owner.
+     * Throws 403 when the caller is a member but not the owner (project exists, caller knows it).
+     * Throws 404 when the caller has no relation to the project (don't leak existence).
+     */
+    private fun requireProjectOwner(
         id: UUID,
-        username: String,
+        user: User,
     ): Project {
-        val owner = requireUser(username)
-        return projectRepository.findByIdAndOwner(id, owner)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found")
+        val owned = projectRepository.findByIdAndOwner(id, user)
+        if (owned != null) return owned
+        val project =
+            projectRepository.findById(id).orElse(null)
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found")
+        if (memberRepository.existsByProjectAndUser(project, user)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Only the project owner can perform this action")
+        }
+        throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found")
     }
 
-    private fun resolveParent(
-        parentId: UUID?,
-        username: String,
-    ): Project? {
-        if (parentId == null) return null
-        val owner = requireUser(username)
-        return projectRepository.findByIdAndOwner(parentId, owner)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Parent project not found")
+    /**
+     * Returns the project when the caller is the owner OR a member.
+     * Throws 404 for anyone else (don't leak existence).
+     */
+    private fun requireProjectAccess(
+        id: UUID,
+        user: User,
+    ): Project {
+        val owned = projectRepository.findByIdAndOwner(id, user)
+        if (owned != null) return owned
+        val project =
+            projectRepository.findById(id).orElse(null)
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found")
+        if (memberRepository.existsByProjectAndUser(project, user)) return project
+        throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found")
     }
 
     private fun checkDepth(parent: Project?) {
@@ -195,6 +264,14 @@ fun Project.toResponse(totalSeconds: Long = 0): ProjectResponse =
         description = description,
         color = color,
         parentId = parent?.id,
+        ownerUsername = owner.username,
         createdAt = createdAt,
         totalSeconds = totalSeconds,
+    )
+
+fun ProjectMember.toMemberResponse(): MemberResponse =
+    MemberResponse(
+        userId = user.id,
+        username = user.username,
+        role = role,
     )

@@ -27,12 +27,24 @@ data class UpdateProjectRequest(
     val color: String? = null,
 )
 
+data class InviteMemberRequest(
+    @field:NotBlank
+    val username: String,
+)
+
 data class ProjectResponse(
     val id: UUID,
     val name: String,
     val description: String?,
     val color: String?,
     val parentId: UUID?,
+    val ownerUsername: String,
     val createdAt: Instant,
     val totalSeconds: Long = 0,
+)
+
+data class MemberResponse(
+    val userId: UUID,
+    val username: String,
+    val role: String,
 )

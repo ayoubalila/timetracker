@@ -18,6 +18,7 @@ const project: ProjectResponse = {
   description: null,
   color: null,
   parentId: null,
+  ownerUsername: 'alice',
   createdAt: '2026-06-24T00:00:00Z',
   totalSeconds: 0,
 }
@@ -328,6 +329,8 @@ describe('ProjectsPage', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/members'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] })
         if (url.includes('/tasks'))
           return Promise.resolve({ ok: true, status: 200, json: async () => tasks })
         if (url.includes('/projects/'))

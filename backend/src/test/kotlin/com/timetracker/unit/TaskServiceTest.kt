@@ -6,10 +6,12 @@ import com.timetracker.dto.UpdateTaskRequest
 import com.timetracker.model.Project
 import com.timetracker.model.Task
 import com.timetracker.model.User
+import com.timetracker.repository.ProjectMemberRepository
 import com.timetracker.repository.ProjectRepository
 import com.timetracker.repository.TaskRepository
 import com.timetracker.repository.UserRepository
 import com.timetracker.service.TaskService
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.any
@@ -18,6 +20,7 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
+import java.util.Optional
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -27,12 +30,20 @@ class TaskServiceTest {
     private val taskRepository: TaskRepository = mock()
     private val projectRepository: ProjectRepository = mock()
     private val userRepository: UserRepository = mock()
-    private val service = TaskService(taskRepository, projectRepository, userRepository)
+    private val memberRepository: ProjectMemberRepository = mock()
+    private val service = TaskService(taskRepository, projectRepository, userRepository, memberRepository)
 
     private val alice = User(username = "alice", email = "alice@test.com", password = "hashed")
     private val now = Instant.now()
 
     private fun stubAlice() = whenever(userRepository.findByUsername("alice")).thenReturn(alice)
+
+    @BeforeEach
+    fun setUp() {
+        // When findById is reached (no owned project found), default to not found
+        whenever(projectRepository.findById(any<UUID>())).thenReturn(Optional.empty())
+        whenever(memberRepository.existsByProjectAndUser(any<Project>(), any<User>())).thenReturn(false)
+    }
 
     private fun task(endTime: Instant? = null) = Task(startTime = now.minusSeconds(60), endTime = endTime, owner = alice)
 
@@ -146,10 +157,43 @@ class TaskServiceTest {
         whenever(taskRepository.existsByOwnerAndEndTimeIsNull(alice)).thenReturn(false)
         val unknownId = UUID.randomUUID()
         whenever(projectRepository.findByIdAndOwner(unknownId, alice)).thenReturn(null)
+        // findById returns empty (setUp default) → 404
 
         val ex =
             assertThrows<ResponseStatusException> {
                 service.start("alice", StartTaskRequest(projectIds = listOf(unknownId)))
+            }
+        assertEquals(404, ex.statusCode.value())
+    }
+
+    @Test
+    fun `start allows member to associate task with shared project`() {
+        stubAlice()
+        whenever(taskRepository.existsByOwnerAndEndTimeIsNull(alice)).thenReturn(false)
+        val bob = User(username = "bob", email = "bob@test.com", password = "hashed")
+        val project = Project(name = "Shared Work", owner = bob)
+        // Alice is not the owner: findByIdAndOwner(project.id, alice) returns null
+        whenever(projectRepository.findById(project.id)).thenReturn(Optional.of(project))
+        whenever(memberRepository.existsByProjectAndUser(project, alice)).thenReturn(true)
+        whenever(taskRepository.save(any<Task>())).thenAnswer { it.arguments[0] as Task }
+
+        val result = service.start("alice", StartTaskRequest(projectIds = listOf(project.id)))
+
+        assertEquals(listOf(project.id), result.projectIds)
+    }
+
+    @Test
+    fun `start throws 404 when user is not member of project`() {
+        stubAlice()
+        whenever(taskRepository.existsByOwnerAndEndTimeIsNull(alice)).thenReturn(false)
+        val bob = User(username = "bob", email = "bob@test.com", password = "hashed")
+        val project = Project(name = "Private", owner = bob)
+        whenever(projectRepository.findById(project.id)).thenReturn(Optional.of(project))
+        // existsByProjectAndUser returns false (setUp default)
+
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.start("alice", StartTaskRequest(projectIds = listOf(project.id)))
             }
         assertEquals(404, ex.statusCode.value())
     }
