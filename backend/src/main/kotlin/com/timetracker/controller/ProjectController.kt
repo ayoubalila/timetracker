@@ -75,6 +75,20 @@ class ProjectController(
         return ResponseEntity.noContent().build()
     }
 
+    @GetMapping("/{id}/export")
+    fun exportTasks(
+        @AuthenticationPrincipal username: String,
+        @PathVariable id: UUID,
+        @RequestParam(required = false) month: String?,
+    ): ResponseEntity<String> {
+        val csv = projectService.exportTasks(username, id, month)
+        return ResponseEntity
+            .ok()
+            .header("Content-Type", "text/csv; charset=UTF-8")
+            .header("Content-Disposition", "attachment; filename=\"export.csv\"")
+            .body(csv)
+    }
+
     // ── member management ──────────────────────────────────────────────────────
 
     @GetMapping("/{id}/members")

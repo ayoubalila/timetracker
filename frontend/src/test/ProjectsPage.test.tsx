@@ -439,4 +439,47 @@ describe('ProjectsPage', () => {
     fireEvent.change(screen.getByTestId('date-from'), { target: { value: '2026-06-01' } })
     await waitFor(() => expect(screen.getByText(/(filtered)/)).toBeTruthy())
   })
+
+  it('export-csv-button is visible when project is selected', async () => {
+    stubWithTasks()
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByTestId('export-csv-button')).toBeTruthy())
+  })
+
+  it('export-csv-button triggers fetch to export endpoint', async () => {
+    const csvBlob = new Blob(['username,project_path\nalice,Work\n'], { type: 'text/csv' })
+    const createObjectURL = vi.fn().mockReturnValue('blob:fake')
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL })
+
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/export'))
+        return Promise.resolve({ ok: true, status: 200, blob: async () => csvBlob })
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [projTask1] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 3600 }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('export-csv-button'))
+    fireEvent.click(screen.getByTestId('export-csv-button'))
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/export'),
+        expect.any(Object),
+      ),
+    )
+  })
 })

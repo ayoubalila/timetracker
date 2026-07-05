@@ -883,4 +883,175 @@ class ProjectControllerTest {
                 jsonPath("$.userBreakdown[0].username") { value("alice") }
             }
     }
+
+    // ── M7C: CSV export ────────────────────────────────────────────────────────
+
+    @Test
+    fun `GET export - 200 returns CSV with correct columns`() {
+        val aliceToken = registerAndGetToken("alice")
+        val id = createProject(aliceToken, "Work")
+        val now = Instant.now()
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Design work",
+                            startTime = now.minusSeconds(3600),
+                            endTime = now,
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        val result =
+            mockMvc
+                .get("/api/projects/$id/export") { header("Authorization", "Bearer $aliceToken") }
+                .andExpect {
+                    status { isOk() }
+                    header { string("Content-Disposition", "attachment; filename=\"export.csv\"") }
+                }.andReturn()
+
+        val csv = result.response.contentAsString
+        assert(csv.startsWith("username,project_path,description,start_time,end_time,duration_seconds"))
+        assert(csv.contains("alice"))
+        assert(csv.contains("Work"))
+        assert(csv.contains("Design work"))
+    }
+
+    @Test
+    fun `GET export - includes running task with blank end_time`() {
+        val aliceToken = registerAndGetToken("alice")
+        val id = createProject(aliceToken, "Work")
+        mockMvc
+            .post("/api/tasks/start") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        mapOf("description" to "Running task", "projectIds" to listOf(id)),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        val result =
+            mockMvc
+                .get("/api/projects/$id/export") { header("Authorization", "Bearer $aliceToken") }
+                .andExpect { status { isOk() } }
+                .andReturn()
+
+        val csv = result.response.contentAsString
+        val dataLine = csv.lines().drop(1).first { it.isNotBlank() }
+        val cols = dataLine.split(",")
+        assert(cols[4] == "") { "end_time should be blank for running task, was: ${cols[4]}" }
+    }
+
+    @Test
+    fun `GET export - month filter includes only tasks in that month`() {
+        val aliceToken = registerAndGetToken("alice")
+        val id = createProject(aliceToken, "Work")
+        // Task in July 2026
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "July task",
+                            startTime = Instant.parse("2026-07-10T10:00:00Z"),
+                            endTime = Instant.parse("2026-07-10T11:00:00Z"),
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+        // Task in June 2026
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "June task",
+                            startTime = Instant.parse("2026-06-10T10:00:00Z"),
+                            endTime = Instant.parse("2026-06-10T11:00:00Z"),
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        val result =
+            mockMvc
+                .get("/api/projects/$id/export?month=2026-07") { header("Authorization", "Bearer $aliceToken") }
+                .andExpect { status { isOk() } }
+                .andReturn()
+
+        val csv = result.response.contentAsString
+        assert(csv.contains("July task")) { "should include July task" }
+        assert(!csv.contains("June task")) { "should not include June task" }
+    }
+
+    @Test
+    fun `GET export - 400 for invalid month format`() {
+        val aliceToken = registerAndGetToken("alice")
+        val id = createProject(aliceToken, "Work")
+        mockMvc
+            .get("/api/projects/$id/export?month=not-a-month") { header("Authorization", "Bearer $aliceToken") }
+            .andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `GET export - 404 for non-member`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        mockMvc
+            .get("/api/projects/$id/export") { header("Authorization", "Bearer $bobToken") }
+            .andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun `GET export - 200 for member`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+        mockMvc
+            .get("/api/projects/$id/export") { header("Authorization", "Bearer $bobToken") }
+            .andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `GET export - includes subproject tasks`() {
+        val aliceToken = registerAndGetToken("alice")
+        val parentId = createProject(aliceToken, "Work")
+        val childId = createProject(aliceToken, "SubProject", parentId)
+        val now = Instant.now()
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Child task",
+                            startTime = now.minusSeconds(3600),
+                            endTime = now,
+                            projectIds = listOf(childId),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        val result =
+            mockMvc
+                .get("/api/projects/$parentId/export") { header("Authorization", "Bearer $aliceToken") }
+                .andExpect { status { isOk() } }
+                .andReturn()
+
+        val csv = result.response.contentAsString
+        assert(csv.contains("Child task")) { "export should include subproject tasks" }
+        assert(csv.contains("Work/SubProject")) { "project_path should show hierarchy" }
+    }
 }

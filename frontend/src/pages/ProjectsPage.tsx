@@ -9,6 +9,7 @@ import {
   deleteProject,
   getProject,
   getProjectTasks,
+  exportProjectCsv,
 } from '../api/projects'
 import { getMembers, inviteMember, removeMember } from '../api/members'
 import { logoutApi } from '../api/auth'
@@ -488,6 +489,26 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                     + Add subproject
                   </button>
                 )}
+
+                <button
+                  onClick={async () => {
+                    try {
+                      const blob = await exportProjectCsv(displayProject.id)
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `${displayProject.name}-export.csv`
+                      a.click()
+                      URL.revokeObjectURL(url)
+                    } catch {
+                      // silent — browser handles errors
+                    }
+                  }}
+                  className="mt-2 text-sm text-gray-600 hover:text-gray-800"
+                  data-testid="export-csv-button"
+                >
+                  ↓ Export CSV
+                </button>
               </div>
 
               {/* Members panel */}

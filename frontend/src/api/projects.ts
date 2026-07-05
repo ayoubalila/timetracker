@@ -1,4 +1,4 @@
-import { apiRequest } from './client'
+import { apiRequest, getToken, ApiError } from './client'
 import type { ProjectResponse, CreateProjectRequest, UpdateProjectRequest } from '../types/project'
 import type { TaskResponse } from '../types/task'
 
@@ -38,4 +38,14 @@ export async function updateProject(id: string, request: UpdateProjectRequest): 
 
 export async function deleteProject(id: string): Promise<void> {
   return apiRequest<void>(`/api/projects/${id}`, { method: 'DELETE' })
+}
+
+export async function exportProjectCsv(id: string, month?: string): Promise<Blob> {
+  const url = month ? `/api/projects/${id}/export?month=${month}` : `/api/projects/${id}/export`
+  const token = getToken()
+  const response = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!response.ok) throw new ApiError(response.status, `Export failed: HTTP ${response.status}`)
+  return response.blob()
 }

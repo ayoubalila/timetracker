@@ -18,6 +18,8 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
+import java.time.YearMonth
+import java.time.ZoneOffset
 import java.util.UUID
 
 private const val MAX_DEPTH = 5
@@ -157,6 +159,55 @@ class ProjectService(
         memberRepository.delete(membership)
     }
 
+    fun exportTasks(
+        username: String,
+        id: UUID,
+        month: String?,
+    ): String {
+        val user = requireUser(username)
+        val project = requireProjectAccess(id, user)
+        val subtree = collectSubtree(project)
+
+        val tasks =
+            if (month != null) {
+                val ym =
+                    runCatching { YearMonth.parse(month) }.getOrElse {
+                        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid month format; use YYYY-MM")
+                    }
+                val from = ym.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant()
+                val to =
+                    ym
+                        .plusMonths(1)
+                        .atDay(1)
+                        .atStartOfDay(ZoneOffset.UTC)
+                        .toInstant()
+                taskRepository.findAllByProjectsInAndTimeRange(subtree, from, to)
+            } else {
+                taskRepository.findAllByProjectsIn(subtree)
+            }
+
+        val sb = StringBuilder()
+        sb.append("username,project_path,description,start_time,end_time,duration_seconds\n")
+        val now = Instant.now()
+        for (task in tasks) {
+            val projPath = task.projects.firstOrNull { it in subtree }?.let { buildProjectPath(it) } ?: ""
+            val endTime = task.endTime
+            val durationSeconds = ((endTime ?: now).epochSecond - task.startTime.epochSecond).coerceAtLeast(0)
+            sb.append(
+                listOf(
+                    csvEscape(task.owner.username),
+                    csvEscape(projPath),
+                    csvEscape(task.description ?: ""),
+                    task.startTime.toString(),
+                    endTime?.toString() ?: "",
+                    durationSeconds.toString(),
+                ).joinToString(","),
+            )
+            sb.append("\n")
+        }
+        return sb.toString()
+    }
+
     // ── helpers ────────────────────────────────────────────────────────────────
 
     private fun requireUser(username: String) =
@@ -240,6 +291,23 @@ class ProjectService(
             queue.addAll(children)
         }
         return result
+    }
+
+    private fun buildProjectPath(project: Project): String {
+        val parts = mutableListOf<String>()
+        var current: Project? = project
+        while (current != null) {
+            parts.add(0, current.name)
+            current = current.parent
+        }
+        return parts.joinToString("/")
+    }
+
+    private fun csvEscape(value: String): String {
+        if (value.contains(',') || value.contains('"') || value.contains('\n')) {
+            return "\"${value.replace("\"", "\"\"")}\""
+        }
+        return value
     }
 
     private fun computeAggregation(
