@@ -440,24 +440,22 @@ describe('ProjectsPage', () => {
     await waitFor(() => expect(screen.getByText(/(filtered)/)).toBeTruthy())
   })
 
-  it('shows user filter dropdown when multiple users have tasks', async () => {
-    const multiUserBreakdown = [
-      { userId: 'u1', username: 'alice', seconds: 3600 },
-      { userId: 'u2', username: 'bob', seconds: 1800 },
-    ]
+  it('shows user filter dropdown when project is shared (has members)', async () => {
+    const sharedProject = { ...project, ownerUserId: 'u-alice' }
+    const bobMember = { userId: 'u2', username: 'bob', role: 'MEMBER', inherited: false }
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
         if (url.includes('/members'))
-          return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+          return Promise.resolve({ ok: true, status: 200, json: async () => [bobMember] })
         if (url.includes('/tasks'))
           return Promise.resolve({ ok: true, status: 200, json: async () => [projTask1] })
         if (url.includes('/projects/'))
           return Promise.resolve({
             ok: true, status: 200,
-            json: async () => ({ ...project, totalSeconds: 5400, userBreakdown: multiUserBreakdown }),
+            json: async () => ({ ...sharedProject, totalSeconds: 3600, userBreakdown: [] }),
           })
-        return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+        return Promise.resolve({ ok: true, status: 200, json: async () => [sharedProject] })
       }),
     )
 
@@ -469,8 +467,8 @@ describe('ProjectsPage', () => {
     const select = screen.getByTestId('user-filter-select') as HTMLSelectElement
     expect(select.value).toBe('')
     const options = Array.from(select.options).map((o) => o.text)
-    expect(options).toContain('alice')
-    expect(options).toContain('bob')
+    expect(options).toContain('alice')  // from ownerUserId+ownerUsername
+    expect(options).toContain('bob')   // from members
   })
 
   it('user filter not shown when only one user has tasks', async () => {
@@ -499,21 +497,19 @@ describe('ProjectsPage', () => {
   })
 
   it('selecting a user in filter passes userId to tasks query', async () => {
-    const multiUserBreakdown = [
-      { userId: 'u1', username: 'alice', seconds: 3600 },
-      { userId: 'u2', username: 'bob', seconds: 1800 },
-    ]
+    const sharedProject = { ...project, ownerUserId: 'u-alice' }
+    const bobMember = { userId: 'u2', username: 'bob', role: 'MEMBER', inherited: false }
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/members'))
-        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+        return Promise.resolve({ ok: true, status: 200, json: async () => [bobMember] })
       if (url.includes('/tasks'))
         return Promise.resolve({ ok: true, status: 200, json: async () => [projTask1] })
       if (url.includes('/projects/'))
         return Promise.resolve({
           ok: true, status: 200,
-          json: async () => ({ ...project, totalSeconds: 5400, userBreakdown: multiUserBreakdown }),
+          json: async () => ({ ...sharedProject, totalSeconds: 3600, userBreakdown: [] }),
         })
-      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [sharedProject] })
     })
     vi.stubGlobal('fetch', fetchMock)
 

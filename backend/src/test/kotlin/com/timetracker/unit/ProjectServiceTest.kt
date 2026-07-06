@@ -554,6 +554,56 @@ class ProjectServiceTest {
         assertEquals(0, result.size)
     }
 
+    @Test
+    fun `getMembers returns inherited members from ancestor project`() {
+        stubBob()
+        val parent = Project(name = "Work", owner = alice)
+        val sub = Project(name = "Backend", owner = alice, parent = parent)
+        whenever(projectRepository.findById(sub.id)).thenReturn(Optional.of(sub))
+        whenever(memberRepository.existsByProjectAndUser(sub, bob)).thenReturn(false)
+        whenever(memberRepository.existsByProjectAndUser(parent, bob)).thenReturn(true)
+        val membership = ProjectMember(project = parent, user = bob)
+        whenever(memberRepository.findAllByProject(sub)).thenReturn(emptyList())
+        whenever(memberRepository.findAllByProject(parent)).thenReturn(listOf(membership))
+
+        val result = service.getMembers("bob", sub.id)
+
+        assertEquals(1, result.size)
+        assertEquals("bob", result[0].username)
+        assertEquals(true, result[0].inherited)
+    }
+
+    @Test
+    fun `getMembers direct member is not marked inherited`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice)
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        val membership = ProjectMember(project = p, user = bob)
+        whenever(memberRepository.findAllByProject(p)).thenReturn(listOf(membership))
+
+        val result = service.getMembers("alice", p.id)
+
+        assertEquals(1, result.size)
+        assertEquals(false, result[0].inherited)
+    }
+
+    @Test
+    fun `getMembers deduplicates member that exists at multiple levels`() {
+        stubAlice()
+        val parent = Project(name = "Work", owner = alice)
+        val sub = Project(name = "Backend", owner = alice, parent = parent)
+        whenever(projectRepository.findByIdAndOwner(sub.id, alice)).thenReturn(sub)
+        val directMembership = ProjectMember(project = sub, user = bob)
+        val parentMembership = ProjectMember(project = parent, user = bob)
+        whenever(memberRepository.findAllByProject(sub)).thenReturn(listOf(directMembership))
+        whenever(memberRepository.findAllByProject(parent)).thenReturn(listOf(parentMembership))
+
+        val result = service.getMembers("alice", sub.id)
+
+        assertEquals(1, result.size)
+        assertEquals(false, result[0].inherited) // direct membership wins (seen first)
+    }
+
     // ── inviteMember ───────────────────────────────────────────────────────────
 
     @Test

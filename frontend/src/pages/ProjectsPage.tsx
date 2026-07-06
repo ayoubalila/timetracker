@@ -523,7 +523,7 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                     {members.map((m) => (
                       <li key={m.userId} className="flex items-center justify-between text-sm">
                         <span data-testid={`member-${m.username}`}>{m.username}</span>
-                        {isOwner && (
+                        {isOwner && !m.inherited && (
                           <button
                             onClick={() =>
                               removeMemberMutation.mutate({
@@ -582,7 +582,7 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                 <div className="px-4 py-3 border-b flex items-center justify-between flex-wrap gap-2">
                   <h3 className="text-sm font-semibold text-gray-700">Tasks</h3>
                   <div className="flex items-center gap-3">
-                    {selectedDetail && Array.isArray(selectedDetail.userBreakdown) && selectedDetail.userBreakdown.length > 1 && (
+                    {members.length > 0 && displayProject && (
                       <select
                         value={filterUserId ?? ''}
                         onChange={(e) => setFilterUserId(e.target.value || null)}
@@ -590,9 +590,14 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                         data-testid="user-filter-select"
                       >
                         <option value="">All users</option>
-                        {selectedDetail.userBreakdown.map((u) => (
-                          <option key={u.userId} value={u.userId}>
-                            {u.username}
+                        {displayProject.ownerUserId && (
+                          <option value={displayProject.ownerUserId}>
+                            {displayProject.ownerUsername}
+                          </option>
+                        )}
+                        {members.map((m) => (
+                          <option key={m.userId} value={m.userId}>
+                            {m.username}
                           </option>
                         ))}
                       </select>

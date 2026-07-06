@@ -11,6 +11,7 @@ export interface ProjectResponse {
   color: string | null
   parentId: string | null
   ownerUsername: string
+  ownerUserId?: string
   createdAt: string
   totalSeconds: number
   userBreakdown: UserTimeBreakdown[]
@@ -20,6 +21,7 @@ export interface MemberResponse {
   userId: string
   username: string
   role: string
+  inherited?: boolean
 }
 
 export interface CreateProjectRequest {

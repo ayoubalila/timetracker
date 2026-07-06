@@ -122,7 +122,20 @@ class ProjectService(
     ): List<MemberResponse> {
         val user = requireUser(username)
         val project = requireProjectAccess(id, user)
-        return memberRepository.findAllByProject(project).map { it.toMemberResponse() }
+        val seen = mutableSetOf<UUID>()
+        val result = mutableListOf<MemberResponse>()
+        var current: Project? = project
+        var direct = true
+        while (current != null) {
+            memberRepository.findAllByProject(current).forEach { m ->
+                if (seen.add(m.user.id)) {
+                    result.add(m.toMemberResponse(inherited = !direct))
+                }
+            }
+            direct = false
+            current = current.parent
+        }
+        return result
     }
 
     fun inviteMember(
@@ -361,14 +374,16 @@ fun Project.toResponse(
         color = color,
         parentId = parent?.id,
         ownerUsername = owner.username,
+        ownerUserId = owner.id,
         createdAt = createdAt,
         totalSeconds = totalSeconds,
         userBreakdown = userBreakdown,
     )
 
-fun ProjectMember.toMemberResponse(): MemberResponse =
+fun ProjectMember.toMemberResponse(inherited: Boolean = false): MemberResponse =
     MemberResponse(
         userId = user.id,
         username = user.username,
         role = role,
+        inherited = inherited,
     )

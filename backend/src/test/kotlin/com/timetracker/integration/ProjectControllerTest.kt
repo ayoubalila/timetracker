@@ -905,6 +905,41 @@ class ProjectControllerTest {
             }
     }
 
+    // ── M7B fix: members panel for subprojects ────────────────────────────────
+
+    @Test
+    fun `GET projects-members - subproject returns inherited members from parent`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val parentId = createProject(aliceToken, "Work")
+        val childId = createProject(aliceToken, "Backend", parentId)
+        inviteUser(aliceToken, parentId, "bob")
+
+        mockMvc
+            .get("/api/projects/$childId/members") { header("Authorization", "Bearer $bobToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(1) }
+                jsonPath("$[0].username") { value("bob") }
+                jsonPath("$[0].inherited") { value(true) }
+            }
+    }
+
+    @Test
+    fun `GET projects-members - direct member not marked inherited`() {
+        val aliceToken = registerAndGetToken("alice")
+        registerAndGetToken("bob")
+        val id = createProject(aliceToken, "Work")
+        inviteUser(aliceToken, id, "bob")
+
+        mockMvc
+            .get("/api/projects/$id/members") { header("Authorization", "Bearer $aliceToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[0].inherited") { value(false) }
+            }
+    }
+
     // ── M7B fix: subproject visibility ────────────────────────────────────────
 
     @Test

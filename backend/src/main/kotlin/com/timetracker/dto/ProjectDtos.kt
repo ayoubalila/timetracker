@@ -45,6 +45,7 @@ data class ProjectResponse(
     val color: String?,
     val parentId: UUID?,
     val ownerUsername: String,
+    val ownerUserId: UUID,
     val createdAt: Instant,
     val totalSeconds: Long = 0,
     val userBreakdown: List<UserTimeBreakdown> = emptyList(),
@@ -54,4 +55,5 @@ data class MemberResponse(
     val userId: UUID,
     val username: String,
     val role: String,
+    val inherited: Boolean = false,
 )
