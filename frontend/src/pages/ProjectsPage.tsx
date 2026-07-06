@@ -72,6 +72,7 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
   const [dateTo, setDateTo] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('startTime')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [filterUserId, setFilterUserId] = useState<string | null>(null)
   const [inviteUsername, setInviteUsername] = useState('')
   const [inviteError, setInviteError] = useState<string | null>(null)
 
@@ -90,8 +91,8 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
   })
 
   const { data: projectTasks = [] } = useQuery({
-    queryKey: ['project-tasks', selectedProjectId, fromIso, toIso],
-    queryFn: () => getProjectTasks(selectedProjectId!, fromIso, toIso),
+    queryKey: ['project-tasks', selectedProjectId, fromIso, toIso, filterUserId],
+    queryFn: () => getProjectTasks(selectedProjectId!, fromIso, toIso, filterUserId ?? undefined),
     enabled: selectedProjectId !== null,
   })
 
@@ -199,6 +200,7 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
     setSelectedProjectId(project.id)
     setDateFrom('')
     setDateTo('')
+    setFilterUserId(null)
   }
 
   function handleClearDateRange() {
@@ -577,12 +579,29 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
 
               {/* Task list */}
               <div className="bg-white rounded-lg border overflow-hidden">
-                <div className="px-4 py-3 border-b flex items-center justify-between">
+                <div className="px-4 py-3 border-b flex items-center justify-between flex-wrap gap-2">
                   <h3 className="text-sm font-semibold text-gray-700">Tasks</h3>
-                  <span className="text-xs text-gray-400">
-                    {projectTasks.length} task{projectTasks.length !== 1 ? 's' : ''}
-                    {(dateFrom || dateTo) ? ' (filtered)' : ''}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    {selectedDetail && Array.isArray(selectedDetail.userBreakdown) && selectedDetail.userBreakdown.length > 1 && (
+                      <select
+                        value={filterUserId ?? ''}
+                        onChange={(e) => setFilterUserId(e.target.value || null)}
+                        className="border rounded px-2 py-1 text-xs"
+                        data-testid="user-filter-select"
+                      >
+                        <option value="">All users</option>
+                        {selectedDetail.userBreakdown.map((u) => (
+                          <option key={u.userId} value={u.userId}>
+                            {u.username}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <span className="text-xs text-gray-400">
+                      {projectTasks.length} task{projectTasks.length !== 1 ? 's' : ''}
+                      {(dateFrom || dateTo) ? ' (filtered)' : ''}
+                    </span>
+                  </div>
                 </div>
 
                 {sortedTasks.length === 0 ? (

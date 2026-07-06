@@ -440,6 +440,98 @@ describe('ProjectsPage', () => {
     await waitFor(() => expect(screen.getByText(/(filtered)/)).toBeTruthy())
   })
 
+  it('shows user filter dropdown when multiple users have tasks', async () => {
+    const multiUserBreakdown = [
+      { userId: 'u1', username: 'alice', seconds: 3600 },
+      { userId: 'u2', username: 'bob', seconds: 1800 },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/members'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+        if (url.includes('/tasks'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => [projTask1] })
+        if (url.includes('/projects/'))
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({ ...project, totalSeconds: 5400, userBreakdown: multiUserBreakdown }),
+          })
+        return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+      }),
+    )
+
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByTestId('user-filter-select')).toBeTruthy())
+    const select = screen.getByTestId('user-filter-select') as HTMLSelectElement
+    expect(select.value).toBe('')
+    const options = Array.from(select.options).map((o) => o.text)
+    expect(options).toContain('alice')
+    expect(options).toContain('bob')
+  })
+
+  it('user filter not shown when only one user has tasks', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/members'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+        if (url.includes('/tasks'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => [projTask1] })
+        if (url.includes('/projects/'))
+          return Promise.resolve({
+            ok: true, status: 200,
+            json: async () => ({ ...project, totalSeconds: 3600, userBreakdown: [{ userId: 'u1', username: 'alice', seconds: 3600 }] }),
+          })
+        return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+      }),
+    )
+
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('project-task-list'))
+    expect(screen.queryByTestId('user-filter-select')).toBeNull()
+  })
+
+  it('selecting a user in filter passes userId to tasks query', async () => {
+    const multiUserBreakdown = [
+      { userId: 'u1', username: 'alice', seconds: 3600 },
+      { userId: 'u2', username: 'bob', seconds: 1800 },
+    ]
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [projTask1] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({
+          ok: true, status: 200,
+          json: async () => ({ ...project, totalSeconds: 5400, userBreakdown: multiUserBreakdown }),
+        })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('user-filter-select'))
+    fireEvent.change(screen.getByTestId('user-filter-select'), { target: { value: 'u2' } })
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('userId=u2'),
+        expect.any(Object),
+      ),
+    )
+  })
+
   it('export-csv-button is visible when project is selected', async () => {
     stubWithTasks()
     const { renderPage } = setup()

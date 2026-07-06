@@ -34,8 +34,9 @@ class ProjectService(
     fun getAll(username: String): List<ProjectResponse> {
         val user = requireUser(username)
         val owned = projectRepository.findAllByOwner(user)
-        val memberProjects = memberRepository.findAllByUser(user).map { it.project }
-        return (owned + memberProjects).distinctBy { it.id }.map { it.toResponse() }
+        val memberRootProjects = memberRepository.findAllByUser(user).map { it.project }
+        val memberSubtrees = memberRootProjects.flatMap { collectSubtree(it) }
+        return (owned + memberSubtrees).distinctBy { it.id }.map { it.toResponse() }
     }
 
     fun create(
@@ -235,7 +236,7 @@ class ProjectService(
     }
 
     /**
-     * Returns the project when the caller is the owner OR a member.
+     * Returns the project when the caller is the owner OR a member of the project or any ancestor.
      * Throws 404 for anyone else (don't leak existence).
      */
     private fun requireProjectAccess(
@@ -247,8 +248,20 @@ class ProjectService(
         val project =
             projectRepository.findById(id).orElse(null)
                 ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found")
-        if (memberRepository.existsByProjectAndUser(project, user)) return project
+        if (isMemberOfProjectOrAncestor(project, user)) return project
         throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found")
+    }
+
+    private fun isMemberOfProjectOrAncestor(
+        project: Project,
+        user: User,
+    ): Boolean {
+        var current: Project? = project
+        while (current != null) {
+            if (memberRepository.existsByProjectAndUser(current, user)) return true
+            current = current.parent
+        }
+        return false
     }
 
     private fun checkDepth(parent: Project?) {

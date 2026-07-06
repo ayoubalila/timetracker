@@ -687,6 +687,74 @@ class ProjectServiceTest {
         assertEquals(403, ex.statusCode.value())
     }
 
+    // ── M7B fix: subproject visibility ────────────────────────────────────────
+
+    @Test
+    fun `getAll includes subprojects of shared projects`() {
+        stubBob()
+        val parent = Project(name = "Work", owner = alice)
+        val child = Project(name = "Backend", owner = alice, parent = parent)
+        whenever(projectRepository.findAllByOwner(bob)).thenReturn(emptyList())
+        whenever(memberRepository.findAllByUser(bob)).thenReturn(
+            listOf(ProjectMember(project = parent, user = bob)),
+        )
+        whenever(projectRepository.findByParent(parent)).thenReturn(listOf(child))
+        whenever(projectRepository.findByParent(child)).thenReturn(emptyList())
+
+        val result = service.getAll("bob")
+
+        assertEquals(2, result.size)
+        assertTrue(result.any { it.name == "Work" })
+        assertTrue(result.any { it.name == "Backend" })
+    }
+
+    @Test
+    fun `getById succeeds for member accessing subproject of shared root`() {
+        stubBob()
+        val parent = Project(name = "Work", owner = alice)
+        val sub = Project(name = "Backend", owner = alice, parent = parent)
+        whenever(projectRepository.findById(sub.id)).thenReturn(Optional.of(sub))
+        whenever(memberRepository.existsByProjectAndUser(sub, bob)).thenReturn(false)
+        whenever(memberRepository.existsByProjectAndUser(parent, bob)).thenReturn(true)
+        whenever(projectRepository.findByParent(sub)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(sub))).thenReturn(emptyList())
+
+        val result = service.getById("bob", sub.id)
+
+        assertEquals("Backend", result.name)
+    }
+
+    @Test
+    fun `getById throws 404 when bob is not member of any ancestor`() {
+        stubBob()
+        val parent = Project(name = "Work", owner = alice)
+        val sub = Project(name = "Backend", owner = alice, parent = parent)
+        whenever(projectRepository.findById(sub.id)).thenReturn(Optional.of(sub))
+        // existsByProjectAndUser returns false for both sub and parent (setUp default)
+
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.getById("bob", sub.id)
+            }
+        assertEquals(404, ex.statusCode.value())
+    }
+
+    @Test
+    fun `getProjectTasks succeeds for member accessing subproject of shared root`() {
+        stubBob()
+        val parent = Project(name = "Work", owner = alice)
+        val sub = Project(name = "Backend", owner = alice, parent = parent)
+        whenever(projectRepository.findById(sub.id)).thenReturn(Optional.of(sub))
+        whenever(memberRepository.existsByProjectAndUser(sub, bob)).thenReturn(false)
+        whenever(memberRepository.existsByProjectAndUser(parent, bob)).thenReturn(true)
+        whenever(projectRepository.findByParent(sub)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(sub))).thenReturn(emptyList())
+
+        val result = service.getProjectTasks("bob", sub.id)
+
+        assertEquals(0, result.size)
+    }
+
     // ── M7B: shared task overview ──────────────────────────────────────────────
 
     @Test

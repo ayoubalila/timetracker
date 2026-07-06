@@ -81,6 +81,27 @@ class ProjectControllerTest {
         return UUID.fromString(objectMapper.readTree(result.response.contentAsString)["id"].asText())
     }
 
+    private fun createTask(
+        token: String,
+        startTime: Instant,
+        endTime: Instant,
+        projectIds: List<UUID> = emptyList(),
+    ) {
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            startTime = startTime,
+                            endTime = endTime,
+                            projectIds = projectIds,
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+    }
+
     @Test
     fun `GET projects - 200 returns empty list`() {
         val token = registerAndGetToken()
@@ -881,6 +902,74 @@ class ProjectControllerTest {
                 jsonPath("$.userBreakdown") { isArray() }
                 jsonPath("$.userBreakdown.length()") { value(1) }
                 jsonPath("$.userBreakdown[0].username") { value("alice") }
+            }
+    }
+
+    // ── M7B fix: subproject visibility ────────────────────────────────────────
+
+    @Test
+    fun `GET projects - member sees subprojects of shared project`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val parentId = createProject(aliceToken, "Work")
+        createProject(aliceToken, "Backend", parentId)
+        inviteUser(aliceToken, parentId, "bob")
+
+        mockMvc
+            .get("/api/projects") { header("Authorization", "Bearer $bobToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(2) }
+                jsonPath("$[?(@.name=='Work')]") { isNotEmpty() }
+                jsonPath("$[?(@.name=='Backend')]") { isNotEmpty() }
+            }
+    }
+
+    @Test
+    fun `GET projects subId - 200 for member of parent project`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val parentId = createProject(aliceToken, "Work")
+        val childId = createProject(aliceToken, "Backend", parentId)
+        inviteUser(aliceToken, parentId, "bob")
+
+        mockMvc
+            .get("/api/projects/$childId") { header("Authorization", "Bearer $bobToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.name") { value("Backend") }
+                jsonPath("$.ownerUsername") { value("alice") }
+            }
+    }
+
+    @Test
+    fun `GET projects subId - 404 for non-member accessing subproject`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val parentId = createProject(aliceToken, "Work")
+        val childId = createProject(aliceToken, "Backend", parentId)
+        // Bob is not invited
+
+        mockMvc
+            .get("/api/projects/$childId") { header("Authorization", "Bearer $bobToken") }
+            .andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun `GET projects subId tasks - 200 for member accessing subproject`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val parentId = createProject(aliceToken, "Work")
+        val childId = createProject(aliceToken, "Backend", parentId)
+        inviteUser(aliceToken, parentId, "bob")
+        val now = Instant.now()
+        createTask(aliceToken, now.minusSeconds(3600), now, listOf(childId))
+
+        mockMvc
+            .get("/api/projects/$childId/tasks") { header("Authorization", "Bearer $bobToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(1) }
             }
     }
 
