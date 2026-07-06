@@ -95,14 +95,14 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 41 | ~~Input validation — all controller endpoints~~ ✅ | feat | Bean Validation annotations, globalExceptionHandler returning RFC 7807 errors |
-| 42 | ~~CORS configuration~~ ✅ | feat | Allow frontend origin only |
-| 43 | ~~Rate limiting on auth endpoints~~ ✅ | feat | Simple in-memory bucket or Spring filter |
-| 44 | ~~Improve frontend error handling (toasts for API errors)~~ ✅ | feat | |
-| 45 | ~~Keyboard shortcuts for start/stop (usability)~~ ✅ | feat | Spec says "few interactions" — spacebar or similar |
-| 46 | ~~Achieve 90% line coverage — backend gap analysis & fill~~ ✅ | test | JaCoCo 90%+ verified; all unit + integration tests pass |
-| 47 | ~~Achieve 90% line coverage — frontend gap analysis & fill~~ ✅ | test | Vitest 90%+ statements/branches/functions/lines; targeted tests for uncovered branches |
-| 48 | ~~Mutation testing baseline (Pitest)~~ ✅ | test | Plugin configured; baseline 91% test strength (69/76 killed); 7 equivalent survivors |
+| 41 | ~~Input validation — all controller endpoints~~ ✅ #36 | feat | Bean Validation annotations, globalExceptionHandler returning RFC 7807 errors |
+| 42 | ~~CORS configuration~~ ✅ #37 | feat | Allow frontend origin only |
+| 43 | ~~Rate limiting on auth endpoints~~ ✅ #37 | feat | Simple in-memory bucket or Spring filter |
+| 44 | ~~Improve frontend error handling (toasts for API errors)~~ ✅ #38 | feat | |
+| 45 | ~~Keyboard shortcuts for start/stop (usability)~~ ✅ #38 | feat | Spec says "few interactions" — spacebar or similar |
+| 46 | ~~Achieve 90% line coverage — backend gap analysis & fill~~ ✅ #39 | test | JaCoCo 90%+ verified; all unit + integration tests pass |
+| 47 | ~~Achieve 90% line coverage — frontend gap analysis & fill~~ ✅ #39 | test | Vitest 90%+ statements/branches/functions/lines; targeted tests for uncovered branches |
+| 48 | ~~Mutation testing baseline (Pitest)~~ ✅ #40 | test | Plugin configured; baseline 91% test strength (69/76 killed); 7 equivalent survivors |
 
 ---
 
@@ -110,13 +110,13 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 49 | ~~Flyway V5 — `project_member` table~~ ✅ | chore | Columns: `project_id` FK, `user_id` FK, `role` VARCHAR(20); UNIQUE (project_id, user_id) |
-| 50 | ~~[US] Invite a registered user to a project~~ ✅ | feat | `POST /api/projects/{id}/members`; owner-only; 404 if username not found; 409 if already member |
-| 51 | ~~[US] View and remove project members~~ ✅ | feat | `GET /api/projects/{id}/members`; `DELETE /api/projects/{id}/members/{userId}`; owner-only remove |
-| 52 | ~~[US] Shared project appears in invitee's project list~~ ✅ | feat | `ProjectService.getAll()` returns owned + member projects; read-only unless owner |
-| 53 | ~~[US] Project members can add tasks to a shared project~~ ✅ | feat | Membership check (owner OR member) in task creation; scoped by project access not user ownership |
-| 54 | ~~Unit tests — ProjectService sharing~~ ✅ | test | Cover invite, remove, access check, non-member rejection |
-| 55 | ~~Integration tests — ProjectController sharing~~ ✅ | test | MockMvc, H2; include auth for both owner and member tokens |
+| 49 | ~~Flyway V5 — `project_member` table~~ ✅ #41 | chore | Columns: `project_id` FK, `user_id` FK, `role` VARCHAR(20); UNIQUE (project_id, user_id) |
+| 50 | ~~[US] Invite a registered user to a project~~ ✅ #42 | feat | `POST /api/projects/{id}/members`; owner-only; 404 if username not found; 409 if already member |
+| 51 | ~~[US] View and remove project members~~ ✅ #43 | feat | `GET /api/projects/{id}/members`; `DELETE /api/projects/{id}/members/{userId}`; owner-only remove |
+| 52 | ~~[US] Shared project appears in invitee's project list~~ ✅ #44 | feat | `ProjectService.getAll()` returns owned + member projects; read-only unless owner |
+| 53 | ~~[US] Project members can add tasks to a shared project~~ ✅ #45 | feat | Membership check (owner OR member) in task creation; scoped by project access not user ownership |
+| 54 | ~~Unit tests — ProjectService sharing~~ ✅ #46 | test | Cover invite, remove, access check, non-member rejection |
+| 55 | ~~Integration tests — ProjectController sharing~~ ✅ #46 | test | MockMvc, H2; include auth for both owner and member tokens |
 
 ---
 
@@ -124,10 +124,10 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 56 | ~~[US] Project task list shows all members' tasks~~ ✅ | feat | `GET /api/projects/{id}/tasks` returns tasks from all participating users |
-| 57 | ~~[US] Filter project task list by user~~ ✅ | feat | `?userId=` query param on project tasks endpoint; member-only access |
-| 58 | ~~[US] Per-user time breakdown on project detail~~ ✅ | feat | Frontend renders time totals per user alongside project total |
-| 59 | ~~Unit + integration tests — shared task overview~~ ✅ | test | |
+| 56 | ~~[US] Project task list shows all members' tasks~~ ✅ #47 | feat | `GET /api/projects/{id}/tasks` returns tasks from all participating users |
+| 57 | ~~[US] Filter project task list by user~~ ✅ #48 | feat | `?userId=` query param on project tasks endpoint; member-only access |
+| 58 | ~~[US] Per-user time breakdown on project detail~~ ✅ #49 | feat | Frontend renders time totals per user alongside project total |
+| 59 | ~~Unit + integration tests — shared task overview~~ ✅ #50 | test | |
 
 ---
 
@@ -135,10 +135,10 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 60 | ~~[US] Export project tasks for a specific month as CSV~~ ✅ | feat | `GET /api/projects/{id}/export?month=2026-07`; includes subproject tasks |
-| 61 | ~~[US] Export all project tasks (no date filter)~~ ✅ | feat | Same endpoint without `month` param; streaming for large datasets |
-| 62 | ~~Export format: CSV columns~~ ✅ | feat | Columns: `username`, `project_path`, `description`, `start_time`, `end_time`, `duration_seconds` |
-| 63 | ~~Unit + integration tests — export endpoint~~ ✅ | test | Verify CSV structure, month filtering, subproject inclusion |
+| 60 | ~~[US] Export project tasks for a specific month as CSV~~ ✅ #51 | feat | `GET /api/projects/{id}/export?month=2026-07`; includes subproject tasks |
+| 61 | ~~[US] Export all project tasks (no date filter)~~ ✅ #51 | feat | Same endpoint without `month` param; streaming for large datasets |
+| 62 | ~~Export format: CSV columns~~ ✅ #51 | feat | Columns: `username`, `project_path`, `description`, `start_time`, `end_time`, `duration_seconds` |
+| 63 | ~~Unit + integration tests — export endpoint~~ ✅ #52 | test | Verify CSV structure, month filtering, subproject inclusion |
 
 ---
 
@@ -146,11 +146,11 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 64 | ~~Flyway V6 — `timezone` column on `users` table~~ ✅ | chore | `VARCHAR(50) NOT NULL DEFAULT 'UTC'`; IANA tz string (e.g. `Europe/Berlin`) |
-| 65 | ~~[US] Set preferred time zone in account settings~~ ✅ | feat | `PUT /api/auth/timezone`; validate against IANA tz database; persisted in DB |
-| 66 | ~~[US] New tasks default to my time zone~~ ✅ | feat | Frontend pre-fills task start time using user's stored tz; backend stores UTC |
-| 67 | ~~[US] Shared project timestamps shown in my time zone~~ ✅ | feat | Frontend converts all UTC timestamps to user's preferred tz for display |
-| 68 | ~~Unit + integration tests — timezone setting~~ ✅ | test | |
+| 64 | ~~Flyway V6 — `timezone` column on `users` table~~ ✅ #53 | chore | `VARCHAR(50) NOT NULL DEFAULT 'UTC'`; IANA tz string (e.g. `Europe/Berlin`) |
+| 65 | ~~[US] Set preferred time zone in account settings~~ ✅ #54 | feat | `PUT /api/auth/timezone`; validate against IANA tz database; persisted in DB |
+| 66 | ~~[US] New tasks default to my time zone~~ ✅ #55 | feat | Frontend pre-fills task start time using user's stored tz; backend stores UTC |
+| 67 | ~~[US] Shared project timestamps shown in my time zone~~ ✅ #56 | feat | Frontend converts all UTC timestamps to user's preferred tz for display |
+| 68 | ~~Unit + integration tests — timezone setting~~ ✅ #57 | test | |
 
 ---
 
