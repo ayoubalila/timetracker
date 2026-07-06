@@ -5,6 +5,7 @@ import com.timetracker.dto.ChangePasswordRequest
 import com.timetracker.dto.LoginRequest
 import com.timetracker.dto.MessageResponse
 import com.timetracker.dto.RegisterRequest
+import com.timetracker.dto.SetTimezoneRequest
 import com.timetracker.service.AuthService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
@@ -42,4 +43,10 @@ class AuthController(
         authService.changePassword(username, request)
         return ResponseEntity.ok(MessageResponse("Password changed successfully"))
     }
+
+    @PutMapping("/timezone")
+    fun setTimezone(
+        @AuthenticationPrincipal username: String,
+        @Valid @RequestBody request: SetTimezoneRequest,
+    ): ResponseEntity<MessageResponse> = ResponseEntity.ok(authService.setTimezone(username, request))
 }

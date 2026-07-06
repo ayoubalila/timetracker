@@ -3,13 +3,16 @@ package com.timetracker.service
 import com.timetracker.dto.AuthResponse
 import com.timetracker.dto.ChangePasswordRequest
 import com.timetracker.dto.LoginRequest
+import com.timetracker.dto.MessageResponse
 import com.timetracker.dto.RegisterRequest
+import com.timetracker.dto.SetTimezoneRequest
 import com.timetracker.model.User
 import com.timetracker.repository.UserRepository
 import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import java.time.ZoneId
 
 @Service
 class AuthService(
@@ -34,6 +37,7 @@ class AuthService(
         return AuthResponse(
             token = jwtService.generateToken(user.username),
             username = user.username,
+            timezone = user.timezone,
         )
     }
 
@@ -47,7 +51,23 @@ class AuthService(
         return AuthResponse(
             token = jwtService.generateToken(user.username),
             username = user.username,
+            timezone = user.timezone,
         )
+    }
+
+    fun setTimezone(
+        username: String,
+        request: SetTimezoneRequest,
+    ): MessageResponse {
+        val user =
+            userRepository.findByUsername(username)
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found")
+        runCatching { ZoneId.of(request.timezone) }.getOrElse {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid timezone: '${request.timezone}'")
+        }
+        user.timezone = request.timezone
+        userRepository.save(user)
+        return MessageResponse("Timezone updated to '${request.timezone}'")
     }
 
     fun changePassword(

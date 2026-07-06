@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.timetracker.dto.ChangePasswordRequest
 import com.timetracker.dto.LoginRequest
 import com.timetracker.dto.RegisterRequest
+import com.timetracker.dto.SetTimezoneRequest
 import com.timetracker.repository.UserRepository
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -161,5 +162,73 @@ class AuthControllerTest {
         mockMvc
             .post("/api/auth/logout")
             .andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `POST register - response includes timezone field`() {
+        mockMvc
+            .post("/api/auth/register") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        RegisterRequest("alice", "alice@test.com", "password1"),
+                    )
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.timezone") { value("UTC") }
+            }
+    }
+
+    @Test
+    fun `POST login - response includes timezone field`() {
+        registerAndGetToken("alice")
+        mockMvc
+            .post("/api/auth/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(LoginRequest("alice", "password1"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.timezone") { isNotEmpty() }
+            }
+    }
+
+    @Test
+    fun `PUT timezone - 200 with valid timezone`() {
+        val token = registerAndGetToken("alice")
+        mockMvc
+            .put("/api/auth/timezone") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(SetTimezoneRequest("Europe/Berlin"))
+            }.andExpect { status { isOk() } }
+
+        // Verify login now returns updated timezone
+        mockMvc
+            .post("/api/auth/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(LoginRequest("alice", "password1"))
+            }.andExpect {
+                jsonPath("$.timezone") { value("Europe/Berlin") }
+            }
+    }
+
+    @Test
+    fun `PUT timezone - 400 with invalid timezone`() {
+        val token = registerAndGetToken("alice")
+        mockMvc
+            .put("/api/auth/timezone") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(SetTimezoneRequest("Not/ATimezone"))
+            }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `PUT timezone - 401 without token`() {
+        mockMvc
+            .put("/api/auth/timezone") {
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(SetTimezoneRequest("UTC"))
+            }.andExpect { status { isUnauthorized() } }
     }
 }

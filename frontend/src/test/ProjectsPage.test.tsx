@@ -34,7 +34,7 @@ function setup() {
       render(
         <QueryClientProvider client={queryClient}>
           <MemoryRouter>
-            <ProjectsPage username="alice" onLogout={vi.fn()} />
+            <ProjectsPage username="alice" onLogout={vi.fn()} timezone="UTC" />
           </MemoryRouter>
         </QueryClientProvider>,
       ),
@@ -535,6 +535,50 @@ describe('ProjectsPage', () => {
     await waitFor(() => screen.getByTestId('project-node-1'))
     fireEvent.click(screen.getByTestId('project-node-1'))
     await waitFor(() => expect(screen.getByTestId('export-csv-button')).toBeTruthy())
+  })
+
+  it('export-month-input is visible when project is selected', async () => {
+    stubWithTasks()
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByTestId('export-month-input')).toBeTruthy())
+  })
+
+  it('export-csv-button with month set sends month param in URL', async () => {
+    const csvBlob = new Blob(['username,project_path\nalice,Work\n'], { type: 'text/csv' })
+    const createObjectURL = vi.fn().mockReturnValue('blob:fake')
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL })
+
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/export'))
+        return Promise.resolve({ ok: true, status: 200, blob: async () => csvBlob })
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [projTask1] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 3600 }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('export-month-input'))
+    fireEvent.change(screen.getByTestId('export-month-input'), { target: { value: '2026-06' } })
+    fireEvent.click(screen.getByTestId('export-csv-button'))
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('month=2026-06'),
+        expect.any(Object),
+      ),
+    )
   })
 
   it('export-csv-button triggers fetch to export endpoint', async () => {

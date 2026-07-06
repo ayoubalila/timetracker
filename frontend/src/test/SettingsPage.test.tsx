@@ -3,10 +3,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { SettingsPage } from '../pages/SettingsPage'
 
-function renderSettings(onLogout = vi.fn()) {
+function renderSettings(onLogout = vi.fn(), timezone = 'UTC', onTimezoneChange = vi.fn()) {
   return render(
     <MemoryRouter>
-      <SettingsPage username="alice" onLogout={onLogout} />
+      <SettingsPage
+        username="alice"
+        onLogout={onLogout}
+        timezone={timezone}
+        onTimezoneChange={onTimezoneChange}
+      />
     </MemoryRouter>,
   )
 }
@@ -139,5 +144,35 @@ describe('SettingsPage', () => {
 
     await waitFor(() => expect(screen.getByTestId('settings-error')).toBeTruthy())
     expect(screen.getByTestId('settings-error').textContent).toContain('Network failure')
+  })
+
+  // ── Timezone section ──────────────────────────────────────────────────────
+
+  it('renders timezone form pre-filled with current timezone', () => {
+    renderSettings(vi.fn(), 'Europe/Berlin')
+    expect(screen.getByTestId('timezone-form')).toBeTruthy()
+    const input = screen.getByTestId('timezone-input') as HTMLInputElement
+    expect(input.value).toBe('Europe/Berlin')
+  })
+
+  it('shows success and calls onTimezoneChange on valid timezone save', async () => {
+    mockFetch({ message: 'Timezone updated to \'America/New_York\'' })
+    const onTimezoneChange = vi.fn()
+    renderSettings(vi.fn(), 'UTC', onTimezoneChange)
+    fireEvent.change(screen.getByTestId('timezone-input'), { target: { value: 'America/New_York' } })
+    fireEvent.submit(screen.getByTestId('timezone-form'))
+
+    await waitFor(() => expect(screen.getByTestId('timezone-success')).toBeTruthy())
+    expect(onTimezoneChange).toHaveBeenCalledWith('America/New_York')
+  })
+
+  it('shows error when timezone API returns 400', async () => {
+    mockFetch('Invalid timezone', false, 400)
+    renderSettings()
+    fireEvent.change(screen.getByTestId('timezone-input'), { target: { value: 'Bad/Zone' } })
+    fireEvent.submit(screen.getByTestId('timezone-form'))
+
+    await waitFor(() => expect(screen.getByTestId('timezone-error')).toBeTruthy())
+    expect(screen.getByTestId('timezone-error').textContent).toContain('Invalid timezone')
   })
 })

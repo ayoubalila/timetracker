@@ -3,6 +3,7 @@ import { apiRequest, setToken, clearToken } from './client'
 export interface AuthResponse {
   token: string
   username: string
+  timezone: string
 }
 
 export interface MessageResponse {
@@ -15,6 +16,7 @@ export async function loginApi(username: string, password: string): Promise<Auth
     body: JSON.stringify({ username, password }),
   })
   setToken(data.token)
+  localStorage.setItem('tz', data.timezone)
   return data
 }
 
@@ -28,6 +30,7 @@ export async function registerApi(
     body: JSON.stringify({ username, email, password }),
   })
   setToken(data.token)
+  localStorage.setItem('tz', data.timezone)
   return data
 }
 
@@ -41,6 +44,14 @@ export async function changePasswordApi(
   })
 }
 
+export async function setTimezoneApi(timezone: string): Promise<MessageResponse> {
+  return apiRequest<MessageResponse>('/api/auth/timezone', {
+    method: 'PUT',
+    body: JSON.stringify({ timezone }),
+  })
+}
+
 export async function logoutApi(): Promise<void> {
   clearToken()
+  localStorage.removeItem('tz')
 }

@@ -19,7 +19,7 @@ function renderDashboard(fetchImpl?: (url: string) => Promise<unknown>) {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <DashboardPage username="alice" onLogout={vi.fn()} />
+        <DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" />
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -108,7 +108,7 @@ describe('DashboardPage', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <DashboardPage username="alice" onLogout={vi.fn()} />
+          <DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" />
         </MemoryRouter>
       </QueryClientProvider>,
     )
@@ -196,7 +196,7 @@ describe('DashboardPage', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <DashboardPage username="alice" onLogout={vi.fn()} />
+          <DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" />
         </MemoryRouter>
       </QueryClientProvider>,
     )
@@ -257,7 +257,7 @@ describe('DashboardPage', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <DashboardPage username="alice" onLogout={vi.fn()} />
+          <DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" />
         </MemoryRouter>
       </QueryClientProvider>,
     )
@@ -296,7 +296,7 @@ describe('DashboardPage', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <DashboardPage username="alice" onLogout={vi.fn()} />
+          <DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" />
         </MemoryRouter>
       </QueryClientProvider>,
     )
@@ -341,7 +341,7 @@ describe('DashboardPage', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <DashboardPage username="alice" onLogout={vi.fn()} />
+          <DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" />
         </MemoryRouter>
       </QueryClientProvider>,
     )
@@ -420,7 +420,7 @@ describe('DashboardPage', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <DashboardPage username="alice" onLogout={vi.fn()} />
+          <DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" />
         </MemoryRouter>
       </QueryClientProvider>,
     )
@@ -447,7 +447,7 @@ describe('DashboardPage', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <DashboardPage username="alice" onLogout={vi.fn()} />
+          <DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" />
         </MemoryRouter>
       </QueryClientProvider>,
     )
@@ -478,7 +478,7 @@ describe('DashboardPage', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={[{ pathname: '/dashboard', state: { startProjectIds: ['p1'], autoOpen: true } }]}>
-          <DashboardPage username="alice" onLogout={vi.fn()} />
+          <DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" />
         </MemoryRouter>
       </QueryClientProvider>,
     )
@@ -509,7 +509,7 @@ describe('DashboardPage', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <DashboardPage username="alice" onLogout={vi.fn()} />
+          <DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" />
         </MemoryRouter>
       </QueryClientProvider>,
     )

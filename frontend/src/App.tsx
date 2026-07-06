@@ -24,15 +24,18 @@ function parseUsername(): string {
 function App() {
   const [loggedIn, setLoggedIn] = useState(isAuthenticated)
   const [username, setUsername] = useState<string>(() => parseUsername())
+  const [timezone, setTimezone] = useState<string>(() => localStorage.getItem('tz') ?? 'UTC')
 
-  function handleLogin(name: string) {
+  function handleLogin(name: string, tz: string) {
     setUsername(name)
+    setTimezone(tz)
     setLoggedIn(true)
   }
 
   function handleLogout() {
     setLoggedIn(false)
     setUsername('')
+    setTimezone('UTC')
   }
 
   useEffect(() => {
@@ -65,7 +68,7 @@ function App() {
               !loggedIn ? (
                 <Navigate to="/login" replace />
               ) : (
-                <DashboardPage username={username} onLogout={handleLogout} />
+                <DashboardPage username={username} onLogout={handleLogout} timezone={timezone} />
               )
             }
           />
@@ -75,7 +78,7 @@ function App() {
               !loggedIn ? (
                 <Navigate to="/login" replace />
               ) : (
-                <ProjectsPage username={username} onLogout={handleLogout} />
+                <ProjectsPage username={username} onLogout={handleLogout} timezone={timezone} />
               )
             }
           />
@@ -85,7 +88,12 @@ function App() {
               !loggedIn ? (
                 <Navigate to="/login" replace />
               ) : (
-                <SettingsPage username={username} onLogout={handleLogout} />
+                <SettingsPage
+                  username={username}
+                  onLogout={handleLogout}
+                  timezone={timezone}
+                  onTimezoneChange={setTimezone}
+                />
               )
             }
           />

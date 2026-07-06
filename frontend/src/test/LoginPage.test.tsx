@@ -43,7 +43,7 @@ describe('LoginPage', () => {
   })
 
   it('calls onLogin on successful login', async () => {
-    mockFetch({ token: 'jwt', username: 'alice' })
+    mockFetch({ token: 'jwt', username: 'alice', timezone: 'UTC' })
     const onLogin = vi.fn()
     render(<LoginPage onLogin={onLogin} />)
 
@@ -51,7 +51,7 @@ describe('LoginPage', () => {
     fireEvent.change(screen.getByTestId('input-password'), { target: { value: 'password1' } })
     fireEvent.click(screen.getByTestId('submit-button'))
 
-    await waitFor(() => expect(onLogin).toHaveBeenCalledWith('alice'))
+    await waitFor(() => expect(onLogin).toHaveBeenCalledWith('alice', 'UTC'))
   })
 
   it('shows error message on failed login', async () => {
@@ -78,7 +78,7 @@ describe('LoginPage', () => {
   })
 
   it('calls onLogin on successful register', async () => {
-    mockFetch({ token: 'jwt', username: 'bob' })
+    mockFetch({ token: 'jwt', username: 'bob', timezone: 'UTC' })
     const onLogin = vi.fn()
     render(<LoginPage onLogin={onLogin} />)
 
@@ -88,7 +88,7 @@ describe('LoginPage', () => {
     fireEvent.change(screen.getByTestId('input-password'), { target: { value: 'password1' } })
     fireEvent.click(screen.getByTestId('submit-button'))
 
-    await waitFor(() => expect(onLogin).toHaveBeenCalledWith('bob'))
+    await waitFor(() => expect(onLogin).toHaveBeenCalledWith('bob', 'UTC'))
   })
 
   it('shows the error message when fetch throws a plain Error', async () => {
@@ -111,6 +111,6 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByTestId('submit-button'))
 
     expect(screen.getByTestId('submit-button').textContent).toBe('Please wait…')
-    resolve({ ok: true, status: 200, json: async () => ({ token: 'x', username: 'alice' }) })
+    resolve({ ok: true, status: 200, json: async () => ({ token: 'x', username: 'alice', timezone: 'UTC' }) })
   })
 })

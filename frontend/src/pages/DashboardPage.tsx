@@ -19,6 +19,7 @@ import { listProjects } from '../api/projects'
 import { logoutApi } from '../api/auth'
 import { ApiError } from '../api/client'
 import { toast } from '../lib/toast'
+import { formatTimeInTz, formatDateInTz } from '../utils/timezone'
 import type { TaskResponse } from '../types/task'
 
 type Tab = 'all' | 'day' | 'week' | 'month'
@@ -28,14 +29,7 @@ type SortDir = 'asc' | 'desc'
 interface DashboardPageProps {
   username: string
   onLogout: () => void
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' })
+  timezone: string
 }
 
 function durationSeconds(task: TaskResponse): number {
@@ -60,7 +54,9 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   return <span className="text-blue-600 ml-1">{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
-export function DashboardPage({ username, onLogout }: DashboardPageProps) {
+export function DashboardPage({ username, onLogout, timezone }: DashboardPageProps) {
+  const formatTime = (iso: string) => formatTimeInTz(iso, timezone)
+  const formatDate = (iso: string) => formatDateInTz(iso, timezone)
   const queryClient = useQueryClient()
   const location = useLocation()
   const locationState = location.state as { startProjectIds?: string[]; autoOpen?: boolean } | null
@@ -530,6 +526,7 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
         <TaskForm
           task={null}
           projects={projects}
+          timezone={timezone}
           onSave={(data) =>
             createMutation.mutate({
               description: data.description || undefined,
@@ -552,6 +549,7 @@ export function DashboardPage({ username, onLogout }: DashboardPageProps) {
         <TaskForm
           task={editingTask}
           projects={projects}
+          timezone={timezone}
           onSave={(data) =>
             updateMutation.mutate({
               id: editingTask.id,

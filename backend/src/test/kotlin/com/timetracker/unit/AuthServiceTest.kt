@@ -3,6 +3,7 @@ package com.timetracker.unit
 import com.timetracker.dto.ChangePasswordRequest
 import com.timetracker.dto.LoginRequest
 import com.timetracker.dto.RegisterRequest
+import com.timetracker.dto.SetTimezoneRequest
 import com.timetracker.model.User
 import com.timetracker.repository.UserRepository
 import com.timetracker.service.AuthService
@@ -24,7 +25,7 @@ class AuthServiceTest {
     private val authService = AuthService(userRepository, passwordEncoder, jwtService)
 
     @Test
-    fun `register - success returns token`() {
+    fun `register - success returns token and default timezone`() {
         whenever(userRepository.existsByUsername("alice")).thenReturn(false)
         whenever(userRepository.existsByEmail("alice@test.com")).thenReturn(false)
         whenever(passwordEncoder.encode("password1")).thenReturn("hashed")
@@ -38,6 +39,7 @@ class AuthServiceTest {
 
         assertEquals("jwt-token", result.token)
         assertEquals("alice", result.username)
+        assertEquals("UTC", result.timezone)
         verify(userRepository).save(any<User>())
     }
 
@@ -65,8 +67,8 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `login - valid credentials returns token`() {
-        val user = User(username = "alice", email = "alice@test.com", password = "hashed")
+    fun `login - valid credentials returns token and timezone`() {
+        val user = User(username = "alice", email = "alice@test.com", password = "hashed", timezone = "Europe/Berlin")
         whenever(userRepository.findByUsername("alice")).thenReturn(user)
         whenever(passwordEncoder.matches("password1", "hashed")).thenReturn(true)
         whenever(jwtService.generateToken("alice")).thenReturn("jwt-token")
@@ -74,6 +76,7 @@ class AuthServiceTest {
         val result = authService.login(LoginRequest("alice", "password1"))
 
         assertEquals("jwt-token", result.token)
+        assertEquals("Europe/Berlin", result.timezone)
     }
 
     @Test
@@ -123,6 +126,30 @@ class AuthServiceTest {
         val ex =
             assertThrows<ResponseStatusException> {
                 authService.changePassword("alice", ChangePasswordRequest("wrong", "newpassword"))
+            }
+        assertEquals(400, ex.statusCode.value())
+    }
+
+    @Test
+    fun `setTimezone - valid timezone updates user`() {
+        val user = User(username = "alice", email = "alice@test.com", password = "hashed")
+        whenever(userRepository.findByUsername("alice")).thenReturn(user)
+        whenever(userRepository.save(any<User>())).thenReturn(user)
+
+        authService.setTimezone("alice", SetTimezoneRequest("Europe/Berlin"))
+
+        verify(userRepository).save(any<User>())
+        assertEquals("Europe/Berlin", user.timezone)
+    }
+
+    @Test
+    fun `setTimezone - invalid timezone throws 400`() {
+        val user = User(username = "alice", email = "alice@test.com", password = "hashed")
+        whenever(userRepository.findByUsername("alice")).thenReturn(user)
+
+        val ex =
+            assertThrows<ResponseStatusException> {
+                authService.setTimezone("alice", SetTimezoneRequest("Not/ATimezone"))
             }
         assertEquals(400, ex.statusCode.value())
     }

@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { changePasswordApi, logoutApi } from '../api/auth'
+import { changePasswordApi, setTimezoneApi, logoutApi } from '../api/auth'
 import { ApiError } from '../api/client'
 
 interface SettingsPageProps {
   username: string
   onLogout: () => void
+  timezone: string
+  onTimezoneChange: (tz: string) => void
 }
 
-export function SettingsPage({ username, onLogout }: SettingsPageProps) {
+export function SettingsPage({ username, onLogout, timezone, onTimezoneChange }: SettingsPageProps) {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -16,9 +18,35 @@ export function SettingsPage({ username, onLogout }: SettingsPageProps) {
   const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const [tzInput, setTzInput] = useState(timezone)
+  const [tzError, setTzError] = useState<string | null>(null)
+  const [tzSuccess, setTzSuccess] = useState<string | null>(null)
+  const [tzLoading, setTzLoading] = useState(false)
+
   function handleLogout() {
     logoutApi()
     onLogout()
+  }
+
+  async function handleTimezoneSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setTzError(null)
+    setTzSuccess(null)
+    setTzLoading(true)
+    try {
+      await setTimezoneApi(tzInput.trim())
+      localStorage.setItem('tz', tzInput.trim())
+      onTimezoneChange(tzInput.trim())
+      setTzSuccess('Timezone updated')
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) {
+        setTzError('Invalid timezone identifier')
+      } else {
+        setTzError(err instanceof Error ? err.message : 'An error occurred')
+      }
+    } finally {
+      setTzLoading(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -144,6 +172,51 @@ export function SettingsPage({ username, onLogout }: SettingsPageProps) {
               className="w-full bg-blue-600 text-white py-2 rounded text-sm font-medium disabled:opacity-50"
             >
               {loading ? 'Saving…' : 'Change password'}
+            </button>
+          </form>
+        </div>
+
+        <div className="bg-white rounded-lg border p-6 mt-6">
+          <h2 className="text-base font-medium mb-1">Preferred Time Zone</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            Task timestamps are displayed in this timezone. New tasks are pre-filled using it.
+          </p>
+
+          <form data-testid="timezone-form" onSubmit={handleTimezoneSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Timezone (IANA identifier, e.g. Europe/Berlin)
+              </label>
+              <input
+                data-testid="timezone-input"
+                type="text"
+                value={tzInput}
+                onChange={(e) => setTzInput(e.target.value)}
+                required
+                className="w-full border rounded px-3 py-2 text-sm"
+                placeholder="UTC"
+              />
+            </div>
+
+            {tzError && (
+              <p data-testid="timezone-error" className="text-red-600 text-sm">
+                {tzError}
+              </p>
+            )}
+
+            {tzSuccess && (
+              <p data-testid="timezone-success" className="text-green-600 text-sm">
+                {tzSuccess}
+              </p>
+            )}
+
+            <button
+              data-testid="timezone-submit"
+              type="submit"
+              disabled={tzLoading}
+              className="w-full bg-blue-600 text-white py-2 rounded text-sm font-medium disabled:opacity-50"
+            >
+              {tzLoading ? 'Saving…' : 'Save timezone'}
             </button>
           </form>
         </div>

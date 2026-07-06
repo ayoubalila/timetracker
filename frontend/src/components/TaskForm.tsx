@@ -1,16 +1,7 @@
 import { useState } from 'react'
 import type { TaskResponse } from '../types/task'
 import type { ProjectResponse } from '../types/project'
-
-function toDatetimeLocal(iso: string): string {
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-function fromDatetimeLocal(value: string): string {
-  return new Date(value).toISOString()
-}
+import { toDatetimeLocalInTz, fromDatetimeLocalInTz } from '../utils/timezone'
 
 interface TaskFormProps {
   task: TaskResponse | null
@@ -24,16 +15,19 @@ interface TaskFormProps {
   onCancel: () => void
   error: string | null
   isPending: boolean
+  timezone?: string
 }
 
-export function TaskForm({ task, projects, onSave, onCancel, error, isPending }: TaskFormProps) {
-  const now = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const defaultStart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`
+export function TaskForm({ task, projects, onSave, onCancel, error, isPending, timezone }: TaskFormProps) {
+  const tz = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  const toLocal = (iso: string) => toDatetimeLocalInTz(iso, tz)
+  const fromLocal = (value: string) => fromDatetimeLocalInTz(value, tz)
+  const defaultStart = toDatetimeLocalInTz(new Date().toISOString(), tz)
 
   const [description, setDescription] = useState(task?.description ?? '')
-  const [startTime, setStartTime] = useState(task ? toDatetimeLocal(task.startTime) : defaultStart)
-  const [endTime, setEndTime] = useState(task?.endTime ? toDatetimeLocal(task.endTime) : '')
+  const [startTime, setStartTime] = useState(task ? toLocal(task.startTime) : defaultStart)
+  const [endTime, setEndTime] = useState(task?.endTime ? toLocal(task.endTime) : '')
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(task?.projectIds ?? [])
 
   function toggleProject(id: string) {
@@ -46,8 +40,8 @@ export function TaskForm({ task, projects, onSave, onCancel, error, isPending }:
     e.preventDefault()
     onSave({
       description,
-      startTime: fromDatetimeLocal(startTime),
-      endTime: endTime ? fromDatetimeLocal(endTime) : undefined,
+      startTime: fromLocal(startTime),
+      endTime: endTime ? fromLocal(endTime) : undefined,
       projectIds: selectedProjectIds,
     })
   }

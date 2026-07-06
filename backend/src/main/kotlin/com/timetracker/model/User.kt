@@ -20,4 +20,6 @@ class User(
     var password: String,
     @Column(nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
+    @Column(nullable = false, length = 50)
+    var timezone: String = "UTC",
 )

@@ -3,7 +3,7 @@ import { loginApi, registerApi } from '../api/auth'
 import { ApiError } from '../api/client'
 
 interface LoginPageProps {
-  onLogin: (username: string) => void
+  onLogin: (username: string, timezone: string) => void
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
@@ -21,10 +21,10 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     try {
       if (tab === 'login') {
         const data = await loginApi(username, password)
-        onLogin(data.username)
+        onLogin(data.username, data.timezone)
       } else {
         const data = await registerApi(username, email, password)
-        onLogin(data.username)
+        onLogin(data.username, data.timezone)
       }
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {

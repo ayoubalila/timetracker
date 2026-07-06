@@ -14,6 +14,7 @@ import {
 import { getMembers, inviteMember, removeMember } from '../api/members'
 import { logoutApi } from '../api/auth'
 import { ApiError } from '../api/client'
+import { formatDateTimeInTz } from '../utils/timezone'
 import type { ProjectResponse } from '../types/project'
 import type { TaskResponse } from '../types/task'
 
@@ -39,14 +40,7 @@ function formatDuration(secs: number): string {
   return `${m}m`
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString([], {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) return <span className="text-gray-300 ml-1">↕</span>
@@ -56,9 +50,11 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 interface ProjectsPageProps {
   username: string
   onLogout: () => void
+  timezone: string
 }
 
-export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
+export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps) {
+  const formatTime = (iso: string) => formatDateTimeInTz(iso, timezone)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
@@ -73,6 +69,7 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
   const [sortKey, setSortKey] = useState<SortKey>('startTime')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [filterUserId, setFilterUserId] = useState<string | null>(null)
+  const [exportMonth, setExportMonth] = useState('')
   const [inviteUsername, setInviteUsername] = useState('')
   const [inviteError, setInviteError] = useState<string | null>(null)
 
@@ -201,6 +198,7 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
     setDateFrom('')
     setDateTo('')
     setFilterUserId(null)
+    setExportMonth('')
   }
 
   function handleClearDateRange() {
@@ -492,25 +490,35 @@ export function ProjectsPage({ username, onLogout }: ProjectsPageProps) {
                   </button>
                 )}
 
-                <button
-                  onClick={async () => {
-                    try {
-                      const blob = await exportProjectCsv(displayProject.id)
-                      const url = URL.createObjectURL(blob)
-                      const a = document.createElement('a')
-                      a.href = url
-                      a.download = `${displayProject.name}-export.csv`
-                      a.click()
-                      URL.revokeObjectURL(url)
-                    } catch {
-                      // silent — browser handles errors
-                    }
-                  }}
-                  className="mt-2 text-sm text-gray-600 hover:text-gray-800"
-                  data-testid="export-csv-button"
-                >
-                  ↓ Export CSV
-                </button>
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <input
+                    type="month"
+                    value={exportMonth}
+                    onChange={(e) => setExportMonth(e.target.value)}
+                    className="border rounded px-2 py-1 text-sm"
+                    data-testid="export-month-input"
+                    placeholder="All months"
+                  />
+                  <button
+                    onClick={async () => {
+                      try {
+                        const blob = await exportProjectCsv(displayProject.id, exportMonth || undefined)
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `${displayProject.name}${exportMonth ? `-${exportMonth}` : ''}-export.csv`
+                        a.click()
+                        URL.revokeObjectURL(url)
+                      } catch {
+                        // silent — browser handles errors
+                      }
+                    }}
+                    className="text-sm text-gray-600 hover:text-gray-800"
+                    data-testid="export-csv-button"
+                  >
+                    ↓ Export CSV{exportMonth ? ` (${exportMonth})` : ''}
+                  </button>
+                </div>
               </div>
 
               {/* Members panel */}

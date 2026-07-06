@@ -34,6 +34,12 @@ data class ChangePasswordRequest(
 data class AuthResponse(
     val token: String,
     val username: String,
+    val timezone: String,
+)
+
+data class SetTimezoneRequest(
+    @field:NotBlank
+    val timezone: String,
 )
 
 data class MessageResponse(
