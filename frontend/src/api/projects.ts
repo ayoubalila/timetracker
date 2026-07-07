@@ -14,11 +14,12 @@ export async function getProject(id: string, from?: string, to?: string): Promis
   return apiRequest<ProjectResponse>(`/api/projects/${id}${query ? `?${query}` : ''}`)
 }
 
-export async function getProjectTasks(id: string, from?: string, to?: string, userId?: string): Promise<TaskResponse[]> {
+export async function getProjectTasks(id: string, from?: string, to?: string, userId?: string, tagId?: string): Promise<TaskResponse[]> {
   const params = new URLSearchParams()
   if (from) params.set('from', from)
   if (to) params.set('to', to)
   if (userId) params.set('userId', userId)
+  if (tagId) params.set('tagId', tagId)
   const query = params.toString()
   return apiRequest<TaskResponse[]>(`/api/projects/${id}/tasks${query ? `?${query}` : ''}`)
 }

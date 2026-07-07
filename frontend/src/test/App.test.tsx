@@ -25,23 +25,23 @@ describe('App', () => {
     expect(screen.getByTestId('tab-login')).toBeTruthy()
   })
 
-  it('shows DashboardPage when valid JWT is in localStorage', () => {
+  it('shows DashboardPage when valid JWT is in localStorage', async () => {
     const payload = btoa(JSON.stringify({ sub: 'alice', exp: 9999999999 }))
     localStorage.setItem('tt_token', `header.${payload}.sig`)
     stubFetch()
 
     render(<App />)
 
-    expect(screen.getByTestId('logout-button')).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId('logout-button')).toBeTruthy())
   })
 
-  it('handles malformed JWT gracefully and shows DashboardPage', () => {
+  it('handles malformed JWT gracefully and shows DashboardPage', async () => {
     localStorage.setItem('tt_token', 'bad.!!!.token')
     stubFetch()
 
     render(<App />)
 
-    expect(screen.getByTestId('logout-button')).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId('logout-button')).toBeTruthy())
   })
 
   it('transitions to DashboardPage after successful login', async () => {
@@ -83,12 +83,12 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByTestId('tab-login')).toBeTruthy())
   })
 
-  it('handles JWT with no sub field and shows dashboard with empty username', () => {
+  it('handles JWT with no sub field and shows dashboard with empty username', async () => {
     const payload = btoa(JSON.stringify({ exp: 9999999999 }))
     localStorage.setItem('tt_token', `header.${payload}.sig`)
     stubFetch()
     render(<App />)
-    expect(screen.getByTestId('logout-button')).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId('logout-button')).toBeTruthy())
   })
 
   it('auth:expired event redirects to login', async () => {

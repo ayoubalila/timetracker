@@ -33,6 +33,13 @@ class Task(
         inverseJoinColumns = [JoinColumn(name = "project_id")],
     )
     var projects: MutableSet<Project> = mutableSetOf(),
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+        name = "task_tag",
+        joinColumns = [JoinColumn(name = "task_id")],
+        inverseJoinColumns = [JoinColumn(name = "tag_id")],
+    )
+    var tags: MutableSet<Tag> = mutableSetOf(),
     @Column(nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
     @Column(nullable = false)

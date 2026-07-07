@@ -8,6 +8,7 @@ import java.util.UUID
 data class StartTaskRequest(
     @field:Size(max = 500) val description: String? = null,
     val projectIds: List<UUID> = emptyList(),
+    val tagIds: List<UUID> = emptyList(),
 )
 
 data class CreateTaskRequest(
@@ -15,6 +16,7 @@ data class CreateTaskRequest(
     @field:NotNull val startTime: Instant,
     val endTime: Instant? = null,
     val projectIds: List<UUID> = emptyList(),
+    val tagIds: List<UUID> = emptyList(),
 )
 
 data class UpdateTaskRequest(
@@ -22,6 +24,7 @@ data class UpdateTaskRequest(
     @field:NotNull val startTime: Instant,
     val endTime: Instant? = null,
     val projectIds: List<UUID> = emptyList(),
+    val tagIds: List<UUID> = emptyList(),
 )
 
 data class TaskResponse(
@@ -30,6 +33,7 @@ data class TaskResponse(
     val startTime: Instant,
     val endTime: Instant?,
     val projectIds: List<UUID>,
+    val tags: List<TagResponse>,
     val ownerUsername: String,
     val createdAt: Instant,
     val updatedAt: Instant,

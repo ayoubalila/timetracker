@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { listProjects, getProject, getProjectTasks, createProject, updateProject, deleteProject } from '../api/projects'
+import { listProjects, getProject, getProjectTasks, createProject, updateProject, deleteProject, exportProjectCsv } from '../api/projects'
 
 const project = {
   id: '123',
@@ -94,5 +94,49 @@ describe('projects api', () => {
     const url = fetchMock.mock.calls[0][0] as string
     expect(url).toContain('from=')
     expect(url).toContain('to=')
+  })
+
+  it('getProjectTasks appends userId when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    await getProjectTasks('123', undefined, undefined, 'user-uuid-1')
+    expect(fetchMock.mock.calls[0][0]).toContain('userId=user-uuid-1')
+  })
+
+  it('getProjectTasks appends tagId when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    await getProjectTasks('123', undefined, undefined, undefined, 'tag-uuid-1')
+    expect(fetchMock.mock.calls[0][0]).toContain('tagId=tag-uuid-1')
+  })
+
+  it('getProjectTasks without params omits query string', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    await getProjectTasks('123')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/projects/123/tasks')
+  })
+
+  it('exportProjectCsv fetches export URL and returns blob', async () => {
+    const blob = new Blob(['csv data'], { type: 'text/csv' })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, blob: async () => blob })
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await exportProjectCsv('123')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/projects/123/export')
+    expect(result).toBe(blob)
+  })
+
+  it('exportProjectCsv appends month param when provided', async () => {
+    const blob = new Blob(['csv data'], { type: 'text/csv' })
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, blob: async () => blob })
+    vi.stubGlobal('fetch', fetchMock)
+    await exportProjectCsv('123', '2026-06')
+    expect(fetchMock.mock.calls[0][0]).toContain('month=2026-06')
+  })
+
+  it('exportProjectCsv throws ApiError on failure', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 403 })
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(exportProjectCsv('123')).rejects.toThrow()
   })
 })

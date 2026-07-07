@@ -1,16 +1,20 @@
 import { useState } from 'react'
 import type { TaskResponse } from '../types/task'
 import type { ProjectResponse } from '../types/project'
+import type { TagResponse } from '../types/tag'
+import { TagPicker } from './TagPicker'
 import { toDatetimeLocalInTz, fromDatetimeLocalInTz } from '../utils/timezone'
 
 interface TaskFormProps {
   task: TaskResponse | null
   projects: ProjectResponse[]
+  tags: TagResponse[]
   onSave: (data: {
     description: string
     startTime: string
     endTime: string | undefined
     projectIds: string[]
+    tagIds: string[]
   }) => void
   onCancel: () => void
   error: string | null
@@ -18,7 +22,7 @@ interface TaskFormProps {
   timezone?: string
 }
 
-export function TaskForm({ task, projects, onSave, onCancel, error, isPending, timezone }: TaskFormProps) {
+export function TaskForm({ task, projects, tags, onSave, onCancel, error, isPending, timezone }: TaskFormProps) {
   const tz = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const toLocal = (iso: string) => toDatetimeLocalInTz(iso, tz)
@@ -29,6 +33,7 @@ export function TaskForm({ task, projects, onSave, onCancel, error, isPending, t
   const [startTime, setStartTime] = useState(task ? toLocal(task.startTime) : defaultStart)
   const [endTime, setEndTime] = useState(task?.endTime ? toLocal(task.endTime) : '')
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(task?.projectIds ?? [])
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(task?.tags?.map((t) => t.id) ?? [])
 
   function toggleProject(id: string) {
     setSelectedProjectIds((prev) =>
@@ -43,6 +48,7 @@ export function TaskForm({ task, projects, onSave, onCancel, error, isPending, t
       startTime: fromLocal(startTime),
       endTime: endTime ? fromLocal(endTime) : undefined,
       projectIds: selectedProjectIds,
+      tagIds: selectedTagIds,
     })
   }
 
@@ -122,6 +128,8 @@ export function TaskForm({ task, projects, onSave, onCancel, error, isPending, t
             </div>
           </fieldset>
         )}
+
+        <TagPicker tags={tags} selected={selectedTagIds} onChange={setSelectedTagIds} />
 
         <div className="flex justify-end gap-2">
           <button

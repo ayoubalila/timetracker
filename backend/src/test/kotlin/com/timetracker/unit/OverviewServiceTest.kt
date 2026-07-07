@@ -5,6 +5,7 @@ import com.timetracker.service.OverviewService
 import com.timetracker.service.TaskService
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
@@ -28,6 +29,7 @@ class OverviewServiceTest {
             startTime = Instant.now().minusSeconds(60),
             endTime = Instant.now(),
             projectIds = emptyList(),
+            tags = emptyList(),
             ownerUsername = "alice",
             createdAt = Instant.now(),
             updatedAt = Instant.now(),
@@ -36,14 +38,14 @@ class OverviewServiceTest {
     @Test
     fun `getDay delegates to taskService with today range`() {
         val expected = listOf(taskResponse())
-        whenever(taskService.listAll(any(), any(), any())).thenReturn(expected)
+        whenever(taskService.listAll(any(), any(), any(), anyOrNull())).thenReturn(expected)
 
         val result = service.getDay("alice")
 
         assertEquals(expected, result)
         val fromCaptor = argumentCaptor<Instant>()
         val toCaptor = argumentCaptor<Instant>()
-        verify(taskService).listAll(any(), fromCaptor.capture(), toCaptor.capture())
+        verify(taskService).listAll(any(), fromCaptor.capture(), toCaptor.capture(), anyOrNull())
         val from = fromCaptor.firstValue
         val to = toCaptor.firstValue
         assertTrue(to.isAfter(from))
@@ -53,13 +55,13 @@ class OverviewServiceTest {
 
     @Test
     fun `getWeek delegates to taskService with Mon–Sun range`() {
-        whenever(taskService.listAll(any(), any(), any())).thenReturn(emptyList())
+        whenever(taskService.listAll(any(), any(), any(), anyOrNull())).thenReturn(emptyList())
 
         service.getWeek("alice")
 
         val fromCaptor = argumentCaptor<Instant>()
         val toCaptor = argumentCaptor<Instant>()
-        verify(taskService).listAll(any(), fromCaptor.capture(), toCaptor.capture())
+        verify(taskService).listAll(any(), fromCaptor.capture(), toCaptor.capture(), anyOrNull())
         val from = fromCaptor.firstValue
         val to = toCaptor.firstValue
         // range spans exactly one week (7 days = 604800 seconds)
@@ -71,13 +73,13 @@ class OverviewServiceTest {
 
     @Test
     fun `getMonth delegates to taskService with first-to-last of month range`() {
-        whenever(taskService.listAll(any(), any(), any())).thenReturn(emptyList())
+        whenever(taskService.listAll(any(), any(), any(), anyOrNull())).thenReturn(emptyList())
 
         service.getMonth("alice")
 
         val fromCaptor = argumentCaptor<Instant>()
         val toCaptor = argumentCaptor<Instant>()
-        verify(taskService).listAll(any(), fromCaptor.capture(), toCaptor.capture())
+        verify(taskService).listAll(any(), fromCaptor.capture(), toCaptor.capture(), anyOrNull())
         val from = fromCaptor.firstValue
         val to = toCaptor.firstValue
         assertTrue(to.isAfter(from))

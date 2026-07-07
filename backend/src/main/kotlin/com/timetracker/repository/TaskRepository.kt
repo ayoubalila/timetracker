@@ -1,6 +1,7 @@
 package com.timetracker.repository
 
 import com.timetracker.model.Project
+import com.timetracker.model.Tag
 import com.timetracker.model.Task
 import com.timetracker.model.User
 import org.springframework.data.jpa.repository.JpaRepository
@@ -31,6 +32,33 @@ interface TaskRepository : JpaRepository<Task, UUID> {
         from: Instant,
         to: Instant,
     ): List<Task>
+
+    // ── tag-filtered queries for personal task list ─────────────────────────
+
+    @Query(
+        "SELECT DISTINCT t FROM Task t JOIN t.tags tag " +
+            "WHERE t.owner = :owner AND tag = :tag " +
+            "ORDER BY t.startTime DESC",
+    )
+    fun findAllByOwnerAndTagOrderByStartTimeDesc(
+        @Param("owner") owner: User,
+        @Param("tag") tag: Tag,
+    ): List<Task>
+
+    @Query(
+        "SELECT DISTINCT t FROM Task t JOIN t.tags tag " +
+            "WHERE t.owner = :owner AND tag = :tag " +
+            "AND t.startTime >= :from AND t.startTime < :to " +
+            "ORDER BY t.startTime DESC",
+    )
+    fun findByOwnerAndTimeRangeAndTag(
+        @Param("owner") owner: User,
+        @Param("from") from: Instant,
+        @Param("to") to: Instant,
+        @Param("tag") tag: Tag,
+    ): List<Task>
+
+    // ── project task queries (shared projects) ──────────────────────────────
 
     @Query(
         "SELECT DISTINCT t FROM Task t JOIN t.projects p " +
@@ -72,6 +100,31 @@ interface TaskRepository : JpaRepository<Task, UUID> {
     )
     fun findAllByProjectsInAndTimeRange(
         @Param("projects") projects: Collection<Project>,
+        @Param("from") from: Instant,
+        @Param("to") to: Instant,
+    ): List<Task>
+
+    // ── project task queries with tag filter ────────────────────────────────
+
+    @Query(
+        "SELECT DISTINCT t FROM Task t JOIN t.projects p JOIN t.tags tag " +
+            "WHERE p IN :projects AND tag = :tag " +
+            "ORDER BY t.startTime DESC",
+    )
+    fun findAllByProjectsInAndTag(
+        @Param("projects") projects: Collection<Project>,
+        @Param("tag") tag: Tag,
+    ): List<Task>
+
+    @Query(
+        "SELECT DISTINCT t FROM Task t JOIN t.projects p JOIN t.tags tag " +
+            "WHERE p IN :projects AND tag = :tag " +
+            "AND t.startTime >= :from AND t.startTime < :to " +
+            "ORDER BY t.startTime DESC",
+    )
+    fun findAllByProjectsInAndTagAndTimeRange(
+        @Param("projects") projects: Collection<Project>,
+        @Param("tag") tag: Tag,
         @Param("from") from: Instant,
         @Param("to") to: Instant,
     ): List<Task>

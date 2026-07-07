@@ -15,6 +15,7 @@ import {
   getOverviewWeek,
   getOverviewMonth,
 } from '../api/tasks'
+import { listTags } from '../api/tags'
 import { listProjects } from '../api/projects'
 import { logoutApi } from '../api/auth'
 import { ApiError } from '../api/client'
@@ -69,6 +70,7 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
   const [formError, setFormError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('startTime')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [filterTagId, setFilterTagId] = useState<string | null>(null)
 
   const { data: currentTaskData, isLoading: currentTaskLoading } = useQuery({
     queryKey: ['current-task'],
@@ -80,32 +82,37 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
       : null
 
   const { data: allTasks = [], isLoading: allLoading } = useQuery({
-    queryKey: ['tasks'],
-    queryFn: () => listTasks(),
+    queryKey: ['tasks', filterTagId],
+    queryFn: () => listTasks(undefined, undefined, filterTagId ?? undefined),
     enabled: activeTab === 'all',
   })
 
   const { data: dayTasks = [], isLoading: dayLoading } = useQuery({
-    queryKey: ['overview-day'],
-    queryFn: getOverviewDay,
+    queryKey: ['overview-day', filterTagId],
+    queryFn: () => getOverviewDay(filterTagId ?? undefined),
     enabled: activeTab === 'day',
   })
 
   const { data: weekTasks = [], isLoading: weekLoading } = useQuery({
-    queryKey: ['overview-week'],
-    queryFn: getOverviewWeek,
+    queryKey: ['overview-week', filterTagId],
+    queryFn: () => getOverviewWeek(filterTagId ?? undefined),
     enabled: activeTab === 'week',
   })
 
   const { data: monthTasks = [], isLoading: monthLoading } = useQuery({
-    queryKey: ['overview-month'],
-    queryFn: getOverviewMonth,
+    queryKey: ['overview-month', filterTagId],
+    queryFn: () => getOverviewMonth(filterTagId ?? undefined),
     enabled: activeTab === 'month',
   })
 
   const { data: projects = [] } = useQuery({
     queryKey: ['projects'],
     queryFn: listProjects,
+  })
+
+  const { data: tags = [] } = useQuery({
+    queryKey: ['tags'],
+    queryFn: listTags,
   })
 
   const rawTasks: TaskResponse[] =
@@ -294,6 +301,19 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
                   {currentTask.description || '(no description)'}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">Started {formatTime(currentTask.startTime)}</p>
+                {(currentTask.tags?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {currentTask.tags?.map((tag) => (
+                      <span
+                        key={tag.id}
+                        className="px-1.5 py-0.5 rounded-full text-xs font-medium text-white"
+                        style={{ backgroundColor: tag.color }}
+                      >
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <LiveTimer startTime={currentTask.startTime} />
               <button
@@ -390,7 +410,7 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
 
         {/* Task overview tabs */}
         <section>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div className="flex gap-1">
               {(['all', 'day', 'week', 'month'] as Tab[]).map((tab) => (
                 <button
@@ -407,16 +427,33 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
                 </button>
               ))}
             </div>
-            <button
-              data-testid="add-task-button"
-              onClick={() => {
-                setShowAddForm(true)
-                setFormError(null)
-              }}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              + Add task
-            </button>
+            <div className="flex items-center gap-2">
+              {tags.length > 0 && (
+                <select
+                  value={filterTagId ?? ''}
+                  onChange={(e) => setFilterTagId(e.target.value || null)}
+                  className="border rounded px-2 py-1 text-xs"
+                  data-testid="tag-filter-select"
+                >
+                  <option value="">All tags</option>
+                  {tags.map((tag) => (
+                    <option key={tag.id} value={tag.id}>
+                      {tag.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button
+                data-testid="add-task-button"
+                onClick={() => {
+                  setShowAddForm(true)
+                  setFormError(null)
+                }}
+                className="text-sm text-blue-600 hover:underline"
+              >
+                + Add task
+              </button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -475,7 +512,23 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
                       data-testid={`task-item-${task.id}`}
                       className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-3 border-b last:border-0 items-center text-sm"
                     >
-                      <span className="truncate font-medium">{task.description || '(no description)'}</span>
+                      <span className="truncate font-medium">
+                        {task.description || '(no description)'}
+                        {(task.tags?.length ?? 0) > 0 && (
+                          <span className="ml-2 inline-flex gap-1 flex-wrap">
+                            {task.tags?.map((tag) => (
+                              <span
+                                key={tag.id}
+                                data-testid={`task-tag-${task.id}-${tag.id}`}
+                                className="px-1.5 py-0.5 rounded-full text-xs font-medium text-white"
+                                style={{ backgroundColor: tag.color }}
+                              >
+                                {tag.name}
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </span>
                       <span className="text-gray-500 text-right whitespace-nowrap">
                         {activeTab !== 'day' && (
                           <span className="mr-1 text-xs text-gray-400">{formatDate(task.startTime)}</span>
@@ -526,6 +579,7 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
         <TaskForm
           task={null}
           projects={projects}
+          tags={tags}
           timezone={timezone}
           onSave={(data) =>
             createMutation.mutate({
@@ -533,6 +587,7 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
               startTime: data.startTime,
               endTime: data.endTime,
               projectIds: data.projectIds,
+              tagIds: data.tagIds,
             })
           }
           onCancel={() => {
@@ -549,6 +604,7 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
         <TaskForm
           task={editingTask}
           projects={projects}
+          tags={tags}
           timezone={timezone}
           onSave={(data) =>
             updateMutation.mutate({
@@ -558,6 +614,7 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
                 startTime: data.startTime,
                 endTime: data.endTime,
                 projectIds: data.projectIds,
+                tagIds: data.tagIds,
               },
             })
           }

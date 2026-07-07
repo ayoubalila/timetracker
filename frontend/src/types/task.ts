@@ -1,9 +1,12 @@
+import type { TagResponse } from './tag'
+
 export interface TaskResponse {
   id: string
   description: string | null
   startTime: string
   endTime: string | null
   projectIds: string[]
+  tags: TagResponse[]
   ownerUsername: string
   createdAt: string
   updatedAt: string
@@ -12,6 +15,7 @@ export interface TaskResponse {
 export interface StartTaskRequest {
   description?: string
   projectIds?: string[]
+  tagIds?: string[]
 }
 
 export interface CreateTaskRequest {
@@ -19,6 +23,7 @@ export interface CreateTaskRequest {
   startTime: string
   endTime?: string
   projectIds?: string[]
+  tagIds?: string[]
 }
 
 export interface UpdateTaskRequest {
@@ -26,4 +31,5 @@ export interface UpdateTaskRequest {
   startTime: string
   endTime?: string
   projectIds?: string[]
+  tagIds?: string[]
 }

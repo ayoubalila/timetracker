@@ -8,6 +8,7 @@ import com.timetracker.model.Task
 import com.timetracker.model.User
 import com.timetracker.repository.ProjectMemberRepository
 import com.timetracker.repository.ProjectRepository
+import com.timetracker.repository.TagRepository
 import com.timetracker.repository.TaskRepository
 import com.timetracker.repository.UserRepository
 import com.timetracker.service.TaskService
@@ -31,7 +32,8 @@ class TaskServiceTest {
     private val projectRepository: ProjectRepository = mock()
     private val userRepository: UserRepository = mock()
     private val memberRepository: ProjectMemberRepository = mock()
-    private val service = TaskService(taskRepository, projectRepository, userRepository, memberRepository)
+    private val tagRepository: TagRepository = mock()
+    private val service = TaskService(taskRepository, projectRepository, userRepository, memberRepository, tagRepository)
 
     private val alice = User(username = "alice", email = "alice@test.com", password = "hashed")
     private val now = Instant.now()

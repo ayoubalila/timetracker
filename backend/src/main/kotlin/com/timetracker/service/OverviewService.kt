@@ -8,24 +8,34 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneOffset
 import java.time.temporal.TemporalAdjusters
+import java.util.UUID
 
 @Service
 class OverviewService(
     private val taskService: TaskService,
 ) {
-    fun getDay(username: String): List<TaskResponse> {
+    fun getDay(
+        username: String,
+        tagId: UUID? = null,
+    ): List<TaskResponse> {
         val (from, to) = dayRange()
-        return taskService.listAll(username, from, to)
+        return taskService.listAll(username, from, to, tagId)
     }
 
-    fun getWeek(username: String): List<TaskResponse> {
+    fun getWeek(
+        username: String,
+        tagId: UUID? = null,
+    ): List<TaskResponse> {
         val (from, to) = weekRange()
-        return taskService.listAll(username, from, to)
+        return taskService.listAll(username, from, to, tagId)
     }
 
-    fun getMonth(username: String): List<TaskResponse> {
+    fun getMonth(
+        username: String,
+        tagId: UUID? = null,
+    ): List<TaskResponse> {
         val (from, to) = monthRange()
-        return taskService.listAll(username, from, to)
+        return taskService.listAll(username, from, to, tagId)
     }
 
     companion object {

@@ -154,4 +154,54 @@ describe('tasks api', () => {
     await listTasks()
     expect(fetchMock.mock.calls[0][0]).toBe('/api/tasks')
   })
+
+  it('listTasks appends tagId param when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    await listTasks(undefined, undefined, 'tag-uuid-1')
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toContain('tagId=tag-uuid-1')
+  })
+
+  it('getOverviewDay appends tagId when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    await getOverviewDay('tag-uuid-1')
+    expect(fetchMock.mock.calls[0][0]).toContain('tagId=tag-uuid-1')
+  })
+
+  it('getOverviewDay omits tagId when not provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    await getOverviewDay()
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/overview/day')
+  })
+
+  it('getOverviewWeek appends tagId when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    await getOverviewWeek('tag-uuid-2')
+    expect(fetchMock.mock.calls[0][0]).toContain('tagId=tag-uuid-2')
+  })
+
+  it('getOverviewWeek omits tagId when not provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    await getOverviewWeek()
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/overview/week')
+  })
+
+  it('getOverviewMonth appends tagId when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    await getOverviewMonth('tag-uuid-3')
+    expect(fetchMock.mock.calls[0][0]).toContain('tagId=tag-uuid-3')
+  })
+
+  it('getOverviewMonth omits tagId when not provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    await getOverviewMonth()
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/overview/month')
+  })
 })

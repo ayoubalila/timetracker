@@ -7,6 +7,7 @@ import com.timetracker.dto.RegisterRequest
 import com.timetracker.dto.StartTaskRequest
 import com.timetracker.dto.UpdateTaskRequest
 import com.timetracker.repository.ProjectRepository
+import com.timetracker.repository.TagRepository
 import com.timetracker.repository.TaskRepository
 import com.timetracker.repository.UserRepository
 import org.junit.jupiter.api.BeforeEach
@@ -36,11 +37,14 @@ class TaskControllerTest {
 
     @Autowired lateinit var taskRepository: TaskRepository
 
+    @Autowired lateinit var tagRepository: TagRepository
+
     @Autowired lateinit var projectRepository: ProjectRepository
 
     @BeforeEach
     fun cleanDb() {
         taskRepository.deleteAll()
+        tagRepository.deleteAll()
         projectRepository.deleteAll()
         userRepository.deleteAll()
     }

@@ -57,7 +57,8 @@ class ProjectController(
         @RequestParam(required = false) from: Instant?,
         @RequestParam(required = false) to: Instant?,
         @RequestParam(required = false) userId: UUID?,
-    ): ResponseEntity<List<TaskResponse>> = ResponseEntity.ok(projectService.getProjectTasks(username, id, from, to, userId))
+        @RequestParam(required = false) tagId: UUID?,
+    ): ResponseEntity<List<TaskResponse>> = ResponseEntity.ok(projectService.getProjectTasks(username, id, from, to, userId, tagId))
 
     @PutMapping("/{id}")
     fun update(
