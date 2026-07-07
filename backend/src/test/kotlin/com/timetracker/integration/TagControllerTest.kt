@@ -229,21 +229,26 @@ class TagControllerTest {
         val end = Instant.now().minusSeconds(60)
 
         // task with tag
-        mockMvc.post("/api/tasks") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                objectMapper.writeValueAsString(
-                    CreateTaskRequest(startTime = start, endTime = end, description = "Meeting", tagIds = listOf(tagId)),
-                )
-        }.andExpect { status { isCreated() } }
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(startTime = start, endTime = end, description = "Meeting", tagIds = listOf(tagId)),
+                    )
+            }.andExpect { status { isCreated() } }
 
         // task without tag
-        mockMvc.post("/api/tasks") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(CreateTaskRequest(startTime = start.minusSeconds(7200), endTime = start.minusSeconds(3600), description = "Coding"))
-        }.andExpect { status { isCreated() } }
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(startTime = start.minusSeconds(7200), endTime = start.minusSeconds(3600), description = "Coding"),
+                    )
+            }.andExpect { status { isCreated() } }
 
         // filter by tag — should return 1
         mockMvc
@@ -262,11 +267,15 @@ class TagControllerTest {
         val start = Instant.now().minusSeconds(1800)
         val end = Instant.now().minusSeconds(60)
 
-        mockMvc.post("/api/tasks") {
-            header("Authorization", "Bearer $token")
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(CreateTaskRequest(startTime = start, endTime = end, description = "Reading book", tagIds = listOf(tagId)))
-        }.andExpect { status { isCreated() } }
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(startTime = start, endTime = end, description = "Reading book", tagIds = listOf(tagId)),
+                    )
+            }.andExpect { status { isCreated() } }
 
         mockMvc
             .get("/api/overview/day?tagId=$tagId") { header("Authorization", "Bearer $token") }
@@ -281,29 +290,32 @@ class TagControllerTest {
     fun `CSV export includes tags column`() {
         val aliceToken = registerAndGetToken("alice")
         val projectResult =
-            mockMvc.post("/api/projects") {
-                header("Authorization", "Bearer $aliceToken")
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"name":"Work"}"""
-            }.andExpect { status { isCreated() } }.andReturn()
+            mockMvc
+                .post("/api/projects") {
+                    header("Authorization", "Bearer $aliceToken")
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"name":"Work"}"""
+                }.andExpect { status { isCreated() } }
+                .andReturn()
         val projectId = objectMapper.readTree(projectResult.response.contentAsString)["id"].asText()
         val tagId = createTag(aliceToken, "deep-work", "#4A90D9")
         val start = Instant.now().minusSeconds(3600)
         val end = Instant.now().minusSeconds(60)
-        mockMvc.post("/api/tasks") {
-            header("Authorization", "Bearer $aliceToken")
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                objectMapper.writeValueAsString(
-                    CreateTaskRequest(
-                        startTime = start,
-                        endTime = end,
-                        description = "Focused",
-                        projectIds = listOf(UUID.fromString(projectId)),
-                        tagIds = listOf(tagId),
-                    ),
-                )
-        }.andExpect { status { isCreated() } }
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            startTime = start,
+                            endTime = end,
+                            description = "Focused",
+                            projectIds = listOf(UUID.fromString(projectId)),
+                            tagIds = listOf(tagId),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
 
         val csv =
             mockMvc

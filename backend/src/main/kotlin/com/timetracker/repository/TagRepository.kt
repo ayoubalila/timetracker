@@ -8,7 +8,13 @@ import java.util.UUID
 interface TagRepository : JpaRepository<Tag, UUID> {
     fun findAllByOwnerOrderByName(owner: User): List<Tag>
 
-    fun findByIdAndOwner(id: UUID, owner: User): Tag?
+    fun findByIdAndOwner(
+        id: UUID,
+        owner: User,
+    ): Tag?
 
-    fun existsByNameAndOwner(name: String, owner: User): Boolean
+    fun existsByNameAndOwner(
+        name: String,
+        owner: User,
+    ): Boolean
 }

@@ -18,7 +18,9 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api/tags")
-class TagController(private val tagService: TagService) {
+class TagController(
+    private val tagService: TagService,
+) {
     @GetMapping
     fun listAll(
         @AuthenticationPrincipal username: String,

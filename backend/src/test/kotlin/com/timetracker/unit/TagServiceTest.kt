@@ -25,8 +25,10 @@ class TagServiceTest {
 
     private fun stubAlice() = whenever(userRepository.findByUsername("alice")).thenReturn(alice)
 
-    private fun tag(name: String = "deep-work", color: String = "#4A90D9") =
-        Tag(name = name, color = color, owner = alice)
+    private fun tag(
+        name: String = "deep-work",
+        color: String = "#4A90D9",
+    ) = Tag(name = name, color = color, owner = alice)
 
     // ── listAll ────────────────────────────────────────────────────────────────
 

@@ -5,6 +5,7 @@ import com.timetracker.dto.LoginRequest
 import com.timetracker.dto.RegisterRequest
 import com.timetracker.dto.StartTaskRequest
 import com.timetracker.repository.ProjectRepository
+import com.timetracker.repository.TagRepository
 import com.timetracker.repository.TaskRepository
 import com.timetracker.repository.UserRepository
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -20,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -33,11 +35,14 @@ class TaskPersistenceTest {
 
     @Autowired lateinit var taskRepository: TaskRepository
 
+    @Autowired lateinit var tagRepository: TagRepository
+
     @Autowired lateinit var projectRepository: ProjectRepository
 
     @BeforeEach
     fun cleanDb() {
         taskRepository.deleteAll()
+        tagRepository.deleteAll()
         projectRepository.deleteAll()
         userRepository.deleteAll()
     }
@@ -122,11 +127,13 @@ class TaskPersistenceTest {
             "Running task must have null endTime"
         }
 
-        // startTime is within the test window — it was actually persisted as an instant
+        // startTime is within the test window — it was actually persisted as an instant.
+        // H2 truncates nanoseconds to microseconds, so compare at microsecond precision.
         val persistedStart = Instant.parse(currentStartTime)
         val after = Instant.now()
-        assertTrue(!persistedStart.isBefore(before) && !persistedStart.isAfter(after)) {
-            "startTime $persistedStart should be between $before and $after"
+        val beforeMicros = before.truncatedTo(ChronoUnit.MICROS)
+        assertTrue(!persistedStart.isBefore(beforeMicros) && !persistedStart.isAfter(after)) {
+            "startTime $persistedStart should be between $beforeMicros and $after"
         }
     }
 
