@@ -216,7 +216,10 @@ describe('DashboardPage', () => {
 
   it('calls logout handler when logout is clicked', () => {
     const onLogout = vi.fn()
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }))
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    }))
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>

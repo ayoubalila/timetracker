@@ -334,6 +334,8 @@ describe('ProjectsPage', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/tags'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] })
         if (url.includes('/members'))
           return Promise.resolve({ ok: true, status: 200, json: async () => [] })
         if (url.includes('/tasks'))
@@ -402,6 +404,10 @@ describe('ProjectsPage', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/tags'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+        if (url.includes('/members'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] })
         if (url.includes('/tasks'))
           return Promise.resolve({ ok: true, status: 200, json: async () => [] })
         if (url.includes('/projects/'))
@@ -448,6 +454,8 @@ describe('ProjectsPage', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/tags'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] })
         if (url.includes('/members'))
           return Promise.resolve({ ok: true, status: 200, json: async () => [bobMember] })
         if (url.includes('/tasks'))
@@ -477,6 +485,8 @@ describe('ProjectsPage', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/tags'))
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] })
         if (url.includes('/members'))
           return Promise.resolve({ ok: true, status: 200, json: async () => [] })
         if (url.includes('/tasks'))
@@ -502,6 +512,8 @@ describe('ProjectsPage', () => {
     const sharedProject = { ...project, ownerUserId: 'u-alice' }
     const bobMember = { userId: 'u2', username: 'bob', role: 'MEMBER', inherited: false }
     const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
       if (url.includes('/members'))
         return Promise.resolve({ ok: true, status: 200, json: async () => [bobMember] })
       if (url.includes('/tasks'))
@@ -557,6 +569,8 @@ describe('ProjectsPage', () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/export'))
         return Promise.resolve({ ok: true, status: 200, blob: async () => csvBlob })
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
       if (url.includes('/members'))
         return Promise.resolve({ ok: true, status: 200, json: async () => [] })
       if (url.includes('/tasks'))
@@ -592,6 +606,8 @@ describe('ProjectsPage', () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/export'))
         return Promise.resolve({ ok: true, status: 200, blob: async () => csvBlob })
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
       if (url.includes('/members'))
         return Promise.resolve({ ok: true, status: 200, json: async () => [] })
       if (url.includes('/tasks'))
@@ -615,5 +631,82 @@ describe('ProjectsPage', () => {
         expect.any(Object),
       ),
     )
+  })
+
+  // ── Tag filter coverage ───────────────────────────────────────────────────
+
+  it('shows tag filter dropdown when user has tags', async () => {
+    const tag = { id: 'tag1', name: 'Bug', color: '#ff0000' }
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [tag] })
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 0 }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByTestId('proj-tag-filter-select')).toBeTruthy())
+    expect(screen.getByText('Bug')).toBeTruthy()
+  })
+
+  it('selecting tag filter passes tagId to project tasks query', async () => {
+    const tag = { id: 'tag1', name: 'Bug', color: '#ff0000' }
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [tag] })
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 0 }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('proj-tag-filter-select'))
+    fireEvent.change(screen.getByTestId('proj-tag-filter-select'), { target: { value: 'tag1' } })
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('tagId=tag1'),
+        expect.any(Object),
+      ),
+    )
+  })
+
+  it('shows tag chips on task rows when tasks have tags', async () => {
+    const tag = { id: 'tag1', name: 'Bug', color: '#ff0000' }
+    const taggedTask: TaskResponse = { ...projTask1, tags: [tag] }
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [taggedTask] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 3600 }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId(`proj-task-tag-pt1-tag1`))
+    expect(screen.getByText('Bug')).toBeTruthy()
   })
 })

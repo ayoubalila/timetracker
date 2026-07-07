@@ -611,8 +611,8 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                             {displayProject.ownerUsername}
                           </option>
                         )}
-                        {members.map((m) => (
-                          <option key={m.userId} value={m.userId}>
+                        {members.map((m, i) => (
+                          <option key={m.userId ?? `m-${i}`} value={m.userId}>
                             {m.username}
                           </option>
                         ))}
