@@ -12,6 +12,7 @@ import com.timetracker.model.ProjectMember
 import com.timetracker.model.User
 import com.timetracker.repository.ProjectMemberRepository
 import com.timetracker.repository.ProjectRepository
+import com.timetracker.repository.TagRepository
 import com.timetracker.repository.TaskRepository
 import com.timetracker.repository.UserRepository
 import org.springframework.http.HttpStatus
@@ -30,6 +31,7 @@ class ProjectService(
     private val taskRepository: TaskRepository,
     private val userRepository: UserRepository,
     private val memberRepository: ProjectMemberRepository,
+    private val tagRepository: TagRepository,
 ) {
     fun getAll(username: String): List<ProjectResponse> {
         val user = requireUser(username)
@@ -101,12 +103,22 @@ class ProjectService(
         from: Instant? = null,
         to: Instant? = null,
         filterUserId: UUID? = null,
+        tagId: UUID? = null,
     ): List<TaskResponse> {
         val user = requireUser(username)
         val project = requireProjectAccess(id, user)
         val subtree = collectSubtree(project)
         val tasks =
-            if (from != null && to != null) {
+            if (tagId != null) {
+                val tag =
+                    tagRepository.findById(tagId).orElse(null)
+                        ?: return emptyList()
+                if (from != null && to != null) {
+                    taskRepository.findAllByProjectsInAndTagAndTimeRange(subtree, tag, from, to)
+                } else {
+                    taskRepository.findAllByProjectsInAndTag(subtree, tag)
+                }
+            } else if (from != null && to != null) {
                 taskRepository.findAllByProjectsInAndTimeRange(subtree, from, to)
             } else {
                 taskRepository.findAllByProjectsIn(subtree)
@@ -201,12 +213,13 @@ class ProjectService(
             }
 
         val sb = StringBuilder()
-        sb.append("username,project_path,description,start_time,end_time,duration_seconds\n")
+        sb.append("username,project_path,description,start_time,end_time,duration_seconds,tags\n")
         val now = Instant.now()
         for (task in tasks) {
             val projPath = task.projects.firstOrNull { it in subtree }?.let { buildProjectPath(it) } ?: ""
             val endTime = task.endTime
             val durationSeconds = ((endTime ?: now).epochSecond - task.startTime.epochSecond).coerceAtLeast(0)
+            val tagsValue = task.tags.sortedBy { it.name }.joinToString(";") { it.name }
             sb.append(
                 listOf(
                     csvEscape(task.owner.username),
@@ -215,6 +228,7 @@ class ProjectService(
                     task.startTime.toString(),
                     endTime?.toString() ?: "",
                     durationSeconds.toString(),
+                    csvEscape(tagsValue),
                 ).joinToString(","),
             )
             sb.append("\n")

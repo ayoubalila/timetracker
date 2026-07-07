@@ -31,7 +31,8 @@ class TaskController(
         @AuthenticationPrincipal username: String,
         @RequestParam(required = false) from: Instant?,
         @RequestParam(required = false) to: Instant?,
-    ): ResponseEntity<List<TaskResponse>> = ResponseEntity.ok(taskService.listAll(username, from, to))
+        @RequestParam(required = false) tagId: UUID?,
+    ): ResponseEntity<List<TaskResponse>> = ResponseEntity.ok(taskService.listAll(username, from, to, tagId))
 
     @PostMapping("/start")
     fun start(
