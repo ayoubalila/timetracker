@@ -119,7 +119,7 @@ describe('DashboardPage', () => {
     fireEvent.submit(screen.getByTestId('start-form'))
 
     await waitFor(() => {
-      const called = fetchMock.mock.calls.some(([url]: [string]) => url.includes('/start'))
+      const called = fetchMock.mock.calls.some(([url]) => url.includes('/start'))
       expect(called).toBe(true)
     })
   })
@@ -207,7 +207,7 @@ describe('DashboardPage', () => {
     expect(window.confirm).toHaveBeenCalledWith('Delete this task?')
     await waitFor(() => {
       const called = fetchMock.mock.calls.some(
-        ([url, opts]: [string, RequestInit]) =>
+        ([url, opts]) =>
           url.includes('done-3') && opts?.method === 'DELETE',
       )
       expect(called).toBe(true)
@@ -221,7 +221,7 @@ describe('DashboardPage', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <DashboardPage username="alice" onLogout={onLogout} />
+          <DashboardPage username="alice" onLogout={onLogout} timezone="UTC" />
         </MemoryRouter>
       </QueryClientProvider>,
     )
@@ -267,7 +267,7 @@ describe('DashboardPage', () => {
 
     await waitFor(() => {
       const called = fetchMock.mock.calls.some(
-        ([url, opts]: [string, RequestInit]) =>
+        ([url, opts]) =>
           url.includes('/stop') && opts?.method === 'POST',
       )
       expect(called).toBe(true)
@@ -308,7 +308,7 @@ describe('DashboardPage', () => {
 
     await waitFor(() => {
       const called = fetchMock.mock.calls.some(
-        ([url, opts]: [string, RequestInit]) =>
+        ([url, opts]) =>
           (url as string) === '/api/tasks' && opts?.method === 'POST',
       )
       expect(called).toBe(true)
@@ -353,7 +353,7 @@ describe('DashboardPage', () => {
 
     await waitFor(() => {
       const called = fetchMock.mock.calls.some(
-        ([url, opts]: [string, RequestInit]) =>
+        ([url, opts]) =>
           (url as string).includes('edit-me') && opts?.method === 'PUT',
       )
       expect(called).toBe(true)
@@ -457,7 +457,7 @@ describe('DashboardPage', () => {
     fireEvent.click(screen.getByTestId('start-project-p1'))
     fireEvent.submit(screen.getByTestId('start-form'))
     await waitFor(() => {
-      const call = fetchMock.mock.calls.find(([url]: [string]) => url.includes('/start'))
+      const call = fetchMock.mock.calls.find(([url]) => url.includes('/start'))
       expect(call).toBeTruthy()
       const body = JSON.parse((call as [string, RequestInit])[1].body as string)
       expect(body.projectIds).toEqual(['p1'])
@@ -558,13 +558,13 @@ describe('DashboardPage', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" /></MemoryRouter>
       </QueryClientProvider>,
     )
     await waitFor(() => screen.getByTestId('tab-day'))
     fireEvent.click(screen.getByTestId('tab-day'))
     await waitFor(() => {
-      const called = fetchMock.mock.calls.some(([url]: [string]) => url.includes('/overview/day'))
+      const called = fetchMock.mock.calls.some(([url]) => url.includes('/overview/day'))
       expect(called).toBe(true)
     })
   })
@@ -578,13 +578,13 @@ describe('DashboardPage', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" /></MemoryRouter>
       </QueryClientProvider>,
     )
     await waitFor(() => screen.getByTestId('tab-week'))
     fireEvent.click(screen.getByTestId('tab-week'))
     await waitFor(() => {
-      const called = fetchMock.mock.calls.some(([url]: [string]) => url.includes('/overview/week'))
+      const called = fetchMock.mock.calls.some(([url]) => url.includes('/overview/week'))
       expect(called).toBe(true)
     })
   })
@@ -598,13 +598,13 @@ describe('DashboardPage', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" /></MemoryRouter>
       </QueryClientProvider>,
     )
     await waitFor(() => screen.getByTestId('tab-month'))
     fireEvent.click(screen.getByTestId('tab-month'))
     await waitFor(() => {
-      const called = fetchMock.mock.calls.some(([url]: [string]) => url.includes('/overview/month'))
+      const called = fetchMock.mock.calls.some(([url]) => url.includes('/overview/month'))
       expect(called).toBe(true)
     })
   })
@@ -673,14 +673,14 @@ describe('DashboardPage', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" /></MemoryRouter>
       </QueryClientProvider>,
     )
     await waitFor(() => screen.getByTestId('stop-button'))
     fireEvent.keyDown(window, { code: 'Space' })
     await waitFor(() => {
       const called = fetchMock.mock.calls.some(
-        ([url, opts]: [string, RequestInit]) => url.includes('/stop') && opts?.method === 'POST',
+        ([url, opts]) => url.includes('/stop') && opts?.method === 'POST',
       )
       expect(called).toBe(true)
     })
@@ -732,7 +732,7 @@ describe('DashboardPage', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" /></MemoryRouter>
       </QueryClientProvider>,
     )
     await waitFor(() => screen.getByTestId('start-task-button'))
@@ -765,7 +765,7 @@ describe('DashboardPage', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" /></MemoryRouter>
       </QueryClientProvider>,
     )
     await waitFor(() => screen.getByTestId('stop-button'))
@@ -785,7 +785,7 @@ describe('DashboardPage', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" /></MemoryRouter>
       </QueryClientProvider>,
     )
     await waitFor(() => screen.getByTestId('add-task-button'))
@@ -816,7 +816,7 @@ describe('DashboardPage', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" /></MemoryRouter>
       </QueryClientProvider>,
     )
     await waitFor(() => screen.getByTestId('edit-task-upd-err'))
@@ -851,7 +851,7 @@ describe('DashboardPage', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" /></MemoryRouter>
       </QueryClientProvider>,
     )
     await waitFor(() => screen.getByTestId('delete-task-del-err'))
@@ -918,7 +918,7 @@ describe('DashboardPage', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} /></MemoryRouter>
+        <MemoryRouter><DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" /></MemoryRouter>
       </QueryClientProvider>,
     )
     // All tab shows date (not day tab)

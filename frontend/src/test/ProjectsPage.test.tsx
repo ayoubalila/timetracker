@@ -202,7 +202,7 @@ describe('ProjectsPage', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <ProjectsPage username="alice" onLogout={onLogout} />
+          <ProjectsPage username="alice" onLogout={onLogout} timezone="UTC" />
         </MemoryRouter>
       </QueryClientProvider>,
     )
@@ -313,6 +313,7 @@ describe('ProjectsPage', () => {
     startTime: '2026-06-29T08:00:00Z',
     endTime: '2026-06-29T09:00:00Z',
     projectIds: ['1'],
+    tags: [],
     ownerUsername: 'alice',
     createdAt: '2026-06-29T08:00:00Z',
     updatedAt: '2026-06-29T09:00:00Z',
@@ -323,6 +324,7 @@ describe('ProjectsPage', () => {
     startTime: '2026-06-29T10:00:00Z',
     endTime: null,
     projectIds: ['1'],
+    tags: [],
     ownerUsername: 'alice',
     createdAt: '2026-06-29T10:00:00Z',
     updatedAt: '2026-06-29T10:00:00Z',

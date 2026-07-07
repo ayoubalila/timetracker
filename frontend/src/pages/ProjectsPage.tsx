@@ -11,6 +11,7 @@ import {
   getProjectTasks,
   exportProjectCsv,
 } from '../api/projects'
+import { listTags } from '../api/tags'
 import { getMembers, inviteMember, removeMember } from '../api/members'
 import { logoutApi } from '../api/auth'
 import { ApiError } from '../api/client'
@@ -69,6 +70,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
   const [sortKey, setSortKey] = useState<SortKey>('startTime')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [filterUserId, setFilterUserId] = useState<string | null>(null)
+  const [filterTagId, setFilterTagId] = useState<string | null>(null)
   const [exportMonth, setExportMonth] = useState('')
   const [inviteUsername, setInviteUsername] = useState('')
   const [inviteError, setInviteError] = useState<string | null>(null)
@@ -76,6 +78,11 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: listProjects,
+  })
+
+  const { data: tags = [] } = useQuery({
+    queryKey: ['tags'],
+    queryFn: listTags,
   })
 
   const fromIso = dateFrom ? new Date(dateFrom).toISOString() : undefined
@@ -88,8 +95,8 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
   })
 
   const { data: projectTasks = [] } = useQuery({
-    queryKey: ['project-tasks', selectedProjectId, fromIso, toIso, filterUserId],
-    queryFn: () => getProjectTasks(selectedProjectId!, fromIso, toIso, filterUserId ?? undefined),
+    queryKey: ['project-tasks', selectedProjectId, fromIso, toIso, filterUserId, filterTagId],
+    queryFn: () => getProjectTasks(selectedProjectId!, fromIso, toIso, filterUserId ?? undefined, filterTagId ?? undefined),
     enabled: selectedProjectId !== null,
   })
 
@@ -198,6 +205,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
     setDateFrom('')
     setDateTo('')
     setFilterUserId(null)
+    setFilterTagId(null)
     setExportMonth('')
   }
 
@@ -610,6 +618,21 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                         ))}
                       </select>
                     )}
+                    {tags.length > 0 && (
+                      <select
+                        value={filterTagId ?? ''}
+                        onChange={(e) => setFilterTagId(e.target.value || null)}
+                        className="border rounded px-2 py-1 text-xs"
+                        data-testid="proj-tag-filter-select"
+                      >
+                        <option value="">All tags</option>
+                        {tags.map((tag) => (
+                          <option key={tag.id} value={tag.id}>
+                            {tag.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <span className="text-xs text-gray-400">
                       {projectTasks.length} task{projectTasks.length !== 1 ? 's' : ''}
                       {(dateFrom || dateTo) ? ' (filtered)' : ''}
@@ -672,6 +695,20 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                             {task.ownerUsername !== username && (
                               <span className="ml-2 text-xs text-gray-400" data-testid={`task-owner-${task.id}`}>
                                 by {task.ownerUsername}
+                              </span>
+                            )}
+                            {(task.tags?.length ?? 0) > 0 && (
+                              <span className="ml-2 inline-flex gap-1 flex-wrap">
+                                {task.tags?.map((tag) => (
+                                  <span
+                                    key={tag.id}
+                                    data-testid={`proj-task-tag-${task.id}-${tag.id}`}
+                                    className="px-1.5 py-0.5 rounded-full text-xs font-medium text-white"
+                                    style={{ backgroundColor: tag.color }}
+                                  >
+                                    {tag.name}
+                                  </span>
+                                ))}
                               </span>
                             )}
                           </span>

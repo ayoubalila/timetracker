@@ -7,10 +7,11 @@ export async function getCurrentTask(): Promise<TaskResponse | null> {
   return result
 }
 
-export async function listTasks(from?: string, to?: string): Promise<TaskResponse[]> {
+export async function listTasks(from?: string, to?: string, tagId?: string): Promise<TaskResponse[]> {
   const params = new URLSearchParams()
   if (from) params.set('from', from)
   if (to) params.set('to', to)
+  if (tagId) params.set('tagId', tagId)
   const query = params.toString()
   return apiRequest<TaskResponse[]>(`/api/tasks${query ? `?${query}` : ''}`)
 }
@@ -48,14 +49,17 @@ export async function deleteTask(id: string): Promise<void> {
   await apiRequest<void>(`/api/tasks/${id}`, { method: 'DELETE' })
 }
 
-export async function getOverviewDay(): Promise<TaskResponse[]> {
-  return apiRequest<TaskResponse[]>('/api/overview/day')
+export async function getOverviewDay(tagId?: string): Promise<TaskResponse[]> {
+  const q = tagId ? `?tagId=${tagId}` : ''
+  return apiRequest<TaskResponse[]>(`/api/overview/day${q}`)
 }
 
-export async function getOverviewWeek(): Promise<TaskResponse[]> {
-  return apiRequest<TaskResponse[]>('/api/overview/week')
+export async function getOverviewWeek(tagId?: string): Promise<TaskResponse[]> {
+  const q = tagId ? `?tagId=${tagId}` : ''
+  return apiRequest<TaskResponse[]>(`/api/overview/week${q}`)
 }
 
-export async function getOverviewMonth(): Promise<TaskResponse[]> {
-  return apiRequest<TaskResponse[]>('/api/overview/month')
+export async function getOverviewMonth(tagId?: string): Promise<TaskResponse[]> {
+  const q = tagId ? `?tagId=${tagId}` : ''
+  return apiRequest<TaskResponse[]>(`/api/overview/month${q}`)
 }

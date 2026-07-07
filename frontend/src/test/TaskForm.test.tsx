@@ -15,6 +15,7 @@ const mockTask: TaskResponse = {
   startTime: '2026-06-29T09:00:00Z',
   endTime: '2026-06-29T10:00:00Z',
   projectIds: ['p1'],
+  tags: [],
   ownerUsername: 'alice',
   createdAt: '2026-06-29T09:00:00Z',
   updatedAt: '2026-06-29T10:00:00Z',
@@ -23,14 +24,14 @@ const mockTask: TaskResponse = {
 describe('TaskForm', () => {
   it('renders create form when task is null', () => {
     render(
-      <TaskForm task={null} projects={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
+      <TaskForm task={null} projects={[]} tags={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
     )
     expect(screen.getByText('Add Task')).toBeTruthy()
   })
 
   it('renders edit form when task is provided', () => {
     render(
-      <TaskForm task={mockTask} projects={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
+      <TaskForm task={mockTask} projects={[]} tags={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
     )
     expect(screen.getByText('Edit Task')).toBeTruthy()
     expect((screen.getByTestId('task-description') as HTMLInputElement).value).toBe('Existing task')
@@ -39,7 +40,7 @@ describe('TaskForm', () => {
   it('calls onCancel when Cancel is clicked', () => {
     const onCancel = vi.fn()
     render(
-      <TaskForm task={null} projects={[]} onSave={vi.fn()} onCancel={onCancel} error={null} isPending={false} />,
+      <TaskForm task={null} projects={[]} tags={[]} onSave={vi.fn()} onCancel={onCancel} error={null} isPending={false} />,
     )
     fireEvent.click(screen.getByTestId('task-form-cancel'))
     expect(onCancel).toHaveBeenCalledOnce()
@@ -48,7 +49,7 @@ describe('TaskForm', () => {
   it('calls onSave with form data on submit', () => {
     const onSave = vi.fn()
     render(
-      <TaskForm task={null} projects={[]} onSave={onSave} onCancel={vi.fn()} error={null} isPending={false} />,
+      <TaskForm task={null} projects={[]} tags={[]} onSave={onSave} onCancel={vi.fn()} error={null} isPending={false} />,
     )
     fireEvent.change(screen.getByTestId('task-description'), { target: { value: 'My task' } })
     fireEvent.submit(screen.getByTestId('task-form'))
@@ -58,21 +59,21 @@ describe('TaskForm', () => {
 
   it('shows error message when error prop is set', () => {
     render(
-      <TaskForm task={null} projects={[]} onSave={vi.fn()} onCancel={vi.fn()} error="Something went wrong" isPending={false} />,
+      <TaskForm task={null} projects={[]} tags={[]} onSave={vi.fn()} onCancel={vi.fn()} error="Something went wrong" isPending={false} />,
     )
     expect(screen.getByTestId('form-error').textContent).toBe('Something went wrong')
   })
 
   it('disables Save button when isPending', () => {
     render(
-      <TaskForm task={null} projects={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={true} />,
+      <TaskForm task={null} projects={[]} tags={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={true} />,
     )
     expect((screen.getByTestId('task-form-save') as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('renders project checkboxes and toggles selection', () => {
     render(
-      <TaskForm task={null} projects={mockProjects} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
+      <TaskForm task={null} projects={mockProjects} tags={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
     )
     const checkbox = screen.getByTestId('project-checkbox-p1') as HTMLInputElement
     expect(checkbox.checked).toBe(false)
@@ -84,7 +85,7 @@ describe('TaskForm', () => {
 
   it('pre-checks projects from existing task', () => {
     render(
-      <TaskForm task={mockTask} projects={mockProjects} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
+      <TaskForm task={mockTask} projects={mockProjects} tags={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
     )
     expect((screen.getByTestId('project-checkbox-p1') as HTMLInputElement).checked).toBe(true)
     expect((screen.getByTestId('project-checkbox-p2') as HTMLInputElement).checked).toBe(false)
@@ -93,7 +94,7 @@ describe('TaskForm', () => {
   it('calls onCancel when overlay is clicked', () => {
     const onCancel = vi.fn()
     render(
-      <TaskForm task={null} projects={[]} onSave={vi.fn()} onCancel={onCancel} error={null} isPending={false} />,
+      <TaskForm task={null} projects={[]} tags={[]} onSave={vi.fn()} onCancel={onCancel} error={null} isPending={false} />,
     )
     fireEvent.click(screen.getByTestId('task-form-overlay'))
     expect(onCancel).toHaveBeenCalledOnce()
@@ -101,7 +102,7 @@ describe('TaskForm', () => {
 
   it('changes start time input value', () => {
     render(
-      <TaskForm task={mockTask} projects={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
+      <TaskForm task={mockTask} projects={[]} tags={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
     )
     const input = screen.getByTestId('task-start-time') as HTMLInputElement
     fireEvent.change(input, { target: { value: '2026-07-01T09:00' } })
@@ -110,7 +111,7 @@ describe('TaskForm', () => {
 
   it('changes end time input value', () => {
     render(
-      <TaskForm task={mockTask} projects={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
+      <TaskForm task={mockTask} projects={[]} tags={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
     )
     const input = screen.getByTestId('task-end-time') as HTMLInputElement
     fireEvent.change(input, { target: { value: '2026-07-01T10:00' } })
@@ -119,14 +120,14 @@ describe('TaskForm', () => {
 
   it('shows "leave empty if still running" label when editing a task', () => {
     render(
-      <TaskForm task={mockTask} projects={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
+      <TaskForm task={mockTask} projects={[]} tags={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={false} />,
     )
     expect(screen.getByText(/leave empty if still running/)).toBeTruthy()
   })
 
   it('shows Saving… text when isPending is true', () => {
     render(
-      <TaskForm task={null} projects={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={true} />,
+      <TaskForm task={null} projects={[]} tags={[]} onSave={vi.fn()} onCancel={vi.fn()} error={null} isPending={true} />,
     )
     expect(screen.getByTestId('task-form-save').textContent).toBe('Saving…')
   })
@@ -134,7 +135,7 @@ describe('TaskForm', () => {
   it('passes endTime as undefined when end time field is empty', () => {
     const onSave = vi.fn()
     render(
-      <TaskForm task={null} projects={[]} onSave={onSave} onCancel={vi.fn()} error={null} isPending={false} />,
+      <TaskForm task={null} projects={[]} tags={[]} onSave={onSave} onCancel={vi.fn()} error={null} isPending={false} />,
     )
     fireEvent.submit(screen.getByTestId('task-form'))
     expect(onSave.mock.calls[0][0].endTime).toBeUndefined()
