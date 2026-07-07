@@ -1,29 +1,40 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SettingsPage } from '../pages/SettingsPage'
+
+function makeClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } })
+}
 
 function renderSettings(onLogout = vi.fn(), timezone = 'UTC', onTimezoneChange = vi.fn()) {
   return render(
-    <MemoryRouter>
-      <SettingsPage
-        username="alice"
-        onLogout={onLogout}
-        timezone={timezone}
-        onTimezoneChange={onTimezoneChange}
-      />
-    </MemoryRouter>,
+    <QueryClientProvider client={makeClient()}>
+      <MemoryRouter>
+        <SettingsPage
+          username="alice"
+          onLogout={onLogout}
+          timezone={timezone}
+          onTimezoneChange={onTimezoneChange}
+        />
+      </MemoryRouter>
+    </QueryClientProvider>,
   )
 }
 
 function mockFetch(body: unknown, ok = true, status = 200) {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue({
-      ok,
-      status,
-      json: async () => body,
-      text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+    vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      return Promise.resolve({
+        ok,
+        status,
+        json: async () => body,
+        text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+      })
     }),
   )
 }
@@ -35,6 +46,7 @@ describe('SettingsPage', () => {
   })
 
   it('renders the change password form', () => {
+    mockFetch({})
     renderSettings()
     expect(screen.getByTestId('change-password-form')).toBeTruthy()
     expect(screen.getByTestId('current-password-input')).toBeTruthy()
@@ -44,6 +56,7 @@ describe('SettingsPage', () => {
   })
 
   it('shows error when new passwords do not match', async () => {
+    mockFetch({})
     renderSettings()
     fireEvent.change(screen.getByTestId('current-password-input'), { target: { value: 'oldpass1' } })
     fireEvent.change(screen.getByTestId('new-password-input'), { target: { value: 'newpass1' } })
@@ -54,15 +67,20 @@ describe('SettingsPage', () => {
   })
 
   it('does not call API when passwords do not match', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+    const passwordSpy = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      passwordSpy(url)
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) })
+    }))
 
     renderSettings()
     fireEvent.change(screen.getByTestId('new-password-input'), { target: { value: 'newpass1' } })
     fireEvent.change(screen.getByTestId('confirm-password-input'), { target: { value: 'mismatch' } })
     fireEvent.submit(screen.getByTestId('change-password-form'))
 
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(passwordSpy).not.toHaveBeenCalled()
   })
 
   it('shows success message after successful password change', async () => {
@@ -107,6 +125,7 @@ describe('SettingsPage', () => {
   })
 
   it('calls logout handler when logout button clicked', () => {
+    mockFetch({})
     const onLogout = vi.fn()
     renderSettings(onLogout)
     fireEvent.click(screen.getByTestId('logout-button'))
@@ -114,6 +133,7 @@ describe('SettingsPage', () => {
   })
 
   it('renders nav links to dashboard, projects, and settings', () => {
+    mockFetch({})
     renderSettings()
     expect(screen.getByTestId('nav-dashboard')).toBeTruthy()
     expect(screen.getByTestId('nav-projects')).toBeTruthy()
@@ -121,7 +141,11 @@ describe('SettingsPage', () => {
   })
 
   it('shows "An error occurred" for non-Error thrown value', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue('not an error object'))
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      return Promise.reject('not an error object')
+    }))
 
     renderSettings()
     fireEvent.change(screen.getByTestId('current-password-input'), { target: { value: 'oldpass1' } })
@@ -134,7 +158,11 @@ describe('SettingsPage', () => {
   })
 
   it('shows generic error message for unexpected errors', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network failure')))
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      return Promise.reject(new Error('Network failure'))
+    }))
 
     renderSettings()
     fireEvent.change(screen.getByTestId('current-password-input'), { target: { value: 'oldpass1' } })
@@ -149,6 +177,7 @@ describe('SettingsPage', () => {
   // ── Timezone section ──────────────────────────────────────────────────────
 
   it('renders timezone form pre-filled with current timezone', () => {
+    mockFetch({})
     renderSettings(vi.fn(), 'Europe/Berlin')
     expect(screen.getByTestId('timezone-form')).toBeTruthy()
     const input = screen.getByTestId('timezone-input') as HTMLInputElement
@@ -156,7 +185,7 @@ describe('SettingsPage', () => {
   })
 
   it('shows success and calls onTimezoneChange on valid timezone save', async () => {
-    mockFetch({ message: 'Timezone updated to \'America/New_York\'' })
+    mockFetch({ message: "Timezone updated to 'America/New_York'" })
     const onTimezoneChange = vi.fn()
     renderSettings(vi.fn(), 'UTC', onTimezoneChange)
     fireEvent.change(screen.getByTestId('timezone-input'), { target: { value: 'America/New_York' } })
@@ -174,5 +203,96 @@ describe('SettingsPage', () => {
 
     await waitFor(() => expect(screen.getByTestId('timezone-error')).toBeTruthy())
     expect(screen.getByTestId('timezone-error').textContent).toContain('Invalid timezone')
+  })
+
+  // ── Tags section ──────────────────────────────────────────────────────────
+
+  it('renders the tags section', () => {
+    mockFetch({})
+    renderSettings()
+    expect(screen.getByTestId('tags-section')).toBeTruthy()
+    expect(screen.getByTestId('tag-name-input')).toBeTruthy()
+    expect(screen.getByTestId('create-tag-submit')).toBeTruthy()
+  })
+
+  it('shows empty state when no tags exist', async () => {
+    mockFetch({})
+    renderSettings()
+    await waitFor(() => expect(screen.getByTestId('tags-empty')).toBeTruthy())
+  })
+
+  it('shows existing tags as chips', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [{ id: 't1', name: 'Work', color: '#2563EB' }] })
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) })
+    }))
+    renderSettings()
+    await waitFor(() => expect(screen.getByTestId('tag-chip-t1')).toBeTruthy())
+    expect(screen.getByTestId('tag-chip-t1').textContent).toContain('Work')
+  })
+
+  it('creates a tag on form submit', async () => {
+    const createSpy = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if ((url as string).includes('/tags') && opts?.method === 'POST') {
+        createSpy()
+        return Promise.resolve({ ok: true, status: 201, json: async () => ({ id: 'new', name: 'Focus', color: '#059669' }) })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    }))
+
+    renderSettings()
+    fireEvent.change(screen.getByTestId('tag-name-input'), { target: { value: 'Focus' } })
+    fireEvent.submit(screen.getByTestId('tag-create-form'))
+
+    await waitFor(() => expect(createSpy).toHaveBeenCalled())
+  })
+
+  it('shows preview chip when name is typed', () => {
+    mockFetch({})
+    renderSettings()
+    fireEvent.change(screen.getByTestId('tag-name-input'), { target: { value: 'Urgent' } })
+    expect(screen.getByTestId('tag-preview')).toBeTruthy()
+    expect(screen.getByTestId('tag-preview').textContent).toContain('Urgent')
+  })
+
+  it('submit button is disabled when name is empty', () => {
+    mockFetch({})
+    renderSettings()
+    const btn = screen.getByTestId('create-tag-submit') as HTMLButtonElement
+    expect(btn.disabled).toBe(true)
+  })
+
+  it('deletes a tag when × button is clicked', async () => {
+    const deleteSpy = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if ((url as string).includes('/tags/t1') && opts?.method === 'DELETE') {
+        deleteSpy()
+        return Promise.resolve({ ok: true, status: 204 })
+      }
+      if ((url as string).includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [{ id: 't1', name: 'Work', color: '#2563EB' }] })
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) })
+    }))
+
+    renderSettings()
+    await waitFor(() => screen.getByTestId('delete-tag-t1'))
+    fireEvent.click(screen.getByTestId('delete-tag-t1'))
+    await waitFor(() => expect(deleteSpy).toHaveBeenCalled())
+  })
+
+  it('shows tag form error when creation fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if ((url as string).includes('/tags') && opts?.method === 'POST')
+        return Promise.resolve({ ok: false, status: 400, text: async () => 'name too long' })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    }))
+
+    renderSettings()
+    fireEvent.change(screen.getByTestId('tag-name-input'), { target: { value: 'Bad' } })
+    fireEvent.submit(screen.getByTestId('tag-create-form'))
+
+    await waitFor(() => expect(screen.getByTestId('tag-form-error')).toBeTruthy())
   })
 })

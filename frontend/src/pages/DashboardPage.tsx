@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { LiveTimer } from '../components/LiveTimer'
+import { TagPicker } from '../components/TagPicker'
 import { TaskForm } from '../components/TaskForm'
 import {
   getCurrentTask,
@@ -67,6 +68,7 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
   const [editingTask, setEditingTask] = useState<TaskResponse | null>(null)
   const [startDescription, setStartDescription] = useState('')
   const [startProjectIds, setStartProjectIds] = useState<string[]>(locationState?.startProjectIds ?? [])
+  const [startTagIds, setStartTagIds] = useState<string[]>([])
   const [formError, setFormError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('startTime')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -155,6 +157,7 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
       setShowStartForm(false)
       setStartDescription('')
       setStartProjectIds([])
+      setStartTagIds([])
       setFormError(null)
     },
     onError: (err: Error) => {
@@ -241,7 +244,7 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
 
   function handleStart(e: React.FormEvent) {
     e.preventDefault()
-    startMutation.mutate({ description: startDescription || undefined, projectIds: startProjectIds })
+    startMutation.mutate({ description: startDescription || undefined, projectIds: startProjectIds, tagIds: startTagIds })
   }
 
   function handleDelete(id: string) {
@@ -353,6 +356,7 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
                       onClick={() => {
                         setShowStartForm(false)
                         setStartProjectIds([])
+                        setStartTagIds([])
                         setFormError(null)
                       }}
                       className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50"
@@ -389,6 +393,7 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
                       </div>
                     </fieldset>
                   )}
+                  <TagPicker tags={tags} selected={startTagIds} onChange={setStartTagIds} />
                   {formError && (
                     <p data-testid="start-error" className="text-red-600 text-sm">
                       {formError}
