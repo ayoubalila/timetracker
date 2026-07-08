@@ -882,4 +882,212 @@ class ProjectServiceTest {
         assertEquals("alice", result.userBreakdown[0].username)
         assertTrue(result.userBreakdown[0].seconds >= 3599L)
     }
+
+    // ── M9B: time budgets ─────────────────────────────────────────────────────
+
+    @Test
+    fun `create stores budget fields`() {
+        stubAlice()
+        whenever(projectRepository.existsByOwnerAndNameAndParentIsNull(alice, "Work")).thenReturn(false)
+        whenever(projectRepository.save(any<Project>())).thenAnswer { it.arguments[0] as Project }
+
+        val result = service.create("alice", CreateProjectRequest(name = "Work", budgetSeconds = 36000L, budgetPeriod = "TOTAL"))
+
+        assertEquals(36000L, result.budgetSeconds)
+        assertEquals("TOTAL", result.budgetPeriod)
+    }
+
+    @Test
+    fun `create - mismatched budget fields throws 400`() {
+        stubAlice()
+        whenever(projectRepository.existsByOwnerAndNameAndParentIsNull(alice, "Work")).thenReturn(false)
+
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.create("alice", CreateProjectRequest(name = "Work", budgetSeconds = 36000L, budgetPeriod = null))
+            }
+        assertEquals(400, ex.statusCode.value())
+    }
+
+    @Test
+    fun `update - budget period only (no seconds) throws 400`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice)
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+
+        val ex =
+            assertThrows<ResponseStatusException> {
+                service.update("alice", p.id, UpdateProjectRequest(name = "Work", budgetSeconds = null, budgetPeriod = "WEEKLY"))
+            }
+        assertEquals(400, ex.statusCode.value())
+    }
+
+    @Test
+    fun `update persists budget fields`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice)
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.save(any<Project>())).thenAnswer { it.arguments[0] as Project }
+
+        val result = service.update("alice", p.id, UpdateProjectRequest(name = "Work", budgetSeconds = 7200L, budgetPeriod = "WEEKLY"))
+
+        assertEquals(7200L, result.budgetSeconds)
+        assertEquals("WEEKLY", result.budgetPeriod)
+    }
+
+    @Test
+    fun `update clears budget when null`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice, budgetSeconds = 7200L, budgetPeriod = "WEEKLY")
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.save(any<Project>())).thenAnswer { it.arguments[0] as Project }
+
+        val result = service.update("alice", p.id, UpdateProjectRequest(name = "Work"))
+
+        assertEquals(null, result.budgetSeconds)
+        assertEquals(null, result.budgetPeriod)
+        assertEquals(null, result.budgetPercent)
+    }
+
+    @Test
+    fun `budgetPercent is null when no budget set`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice)
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(emptyList())
+
+        val result = service.getById("alice", p.id)
+
+        assertEquals(null, result.budgetPercent)
+    }
+
+    @Test
+    fun `budgetPercent is computed correctly for TOTAL period`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice, budgetSeconds = 3600L, budgetPeriod = "TOTAL")
+        val now = Instant.now()
+        val task = Task(startTime = now.minusSeconds(1800), endTime = now, owner = alice, projects = mutableSetOf(p))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(task))
+
+        val result = service.getById("alice", p.id)
+
+        assertEquals(1800L, result.usedSeconds)
+        // 1800 / 3600 * 100 = 50%
+        assertTrue(result.budgetPercent != null && result.budgetPercent!! in 49.0..51.0)
+    }
+
+    @Test
+    fun `budgetPercent is 100 or more when budget exceeded`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice, budgetSeconds = 3600L, budgetPeriod = "TOTAL")
+        val now = Instant.now()
+        val task = Task(startTime = now.minusSeconds(7200), endTime = now, owner = alice, projects = mutableSetOf(p))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(task))
+
+        val result = service.getById("alice", p.id)
+
+        assertTrue(result.budgetPercent != null && result.budgetPercent!! >= 100.0)
+    }
+
+    @Test
+    fun `computeUsedSeconds TOTAL returns all task seconds`() {
+        val p = Project(name = "Work", owner = alice, budgetSeconds = 7200L, budgetPeriod = "TOTAL")
+        val now = Instant.now()
+        val task = Task(startTime = now.minusSeconds(3600), endTime = now, owner = alice, projects = mutableSetOf(p))
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(task))
+
+        val result = service.computeUsedSeconds(p)
+
+        assertTrue(result >= 3599L)
+    }
+
+    @Test
+    fun `computeUsedSeconds WEEKLY only counts tasks in current week`() {
+        val p = Project(name = "Work", owner = alice, budgetSeconds = 7200L, budgetPeriod = "WEEKLY")
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        // Return empty for the weekly range query
+        whenever(taskRepository.findAllByProjectsInAndTimeRange(any(), any(), any())).thenReturn(emptyList())
+
+        val result = service.computeUsedSeconds(p)
+
+        assertEquals(0L, result)
+        // Verify that the range query was called (not the no-range one)
+        verify(taskRepository).findAllByProjectsInAndTimeRange(any(), any(), any())
+    }
+
+    @Test
+    fun `computeUsedSeconds MONTHLY only counts tasks in current month`() {
+        val p = Project(name = "Work", owner = alice, budgetSeconds = 7200L, budgetPeriod = "MONTHLY")
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsInAndTimeRange(any(), any(), any())).thenReturn(emptyList())
+
+        val result = service.computeUsedSeconds(p)
+
+        assertEquals(0L, result)
+        verify(taskRepository).findAllByProjectsInAndTimeRange(any(), any(), any())
+    }
+
+    @Test
+    fun `computeUsedSeconds with unknown period returns 0`() {
+        val p = Project(name = "Work", owner = alice, budgetSeconds = 7200L, budgetPeriod = "UNKNOWN")
+
+        val result = service.computeUsedSeconds(p)
+
+        assertEquals(0L, result)
+    }
+
+    @Test
+    fun `computeUsedSeconds counts running task duration up to now`() {
+        val p = Project(name = "Work", owner = alice, budgetSeconds = 7200L, budgetPeriod = "TOTAL")
+        val startTime = Instant.now().minusSeconds(60)
+        val runningTask = Task(startTime = startTime, endTime = null, owner = alice, projects = mutableSetOf(p))
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(runningTask))
+
+        val result = service.computeUsedSeconds(p)
+
+        assertTrue(result >= 59L)
+    }
+
+    @Test
+    fun `getAll includes usedSeconds when budget is set`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice, budgetSeconds = 7200L, budgetPeriod = "TOTAL")
+        val now = Instant.now()
+        val task = Task(startTime = now.minusSeconds(3600), endTime = now, owner = alice, projects = mutableSetOf(p))
+        whenever(projectRepository.findAllByOwner(alice)).thenReturn(listOf(p))
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(task))
+
+        val result = service.getAll("alice")
+
+        assertEquals(1, result.size)
+        assertTrue(result[0].usedSeconds >= 3599L)
+        assertTrue(result[0].budgetPercent != null)
+    }
+
+    @Test
+    fun `shared project budget measures combined member time`() {
+        stubAlice()
+        val p = Project(name = "Shared", owner = alice, budgetSeconds = 7200L, budgetPeriod = "TOTAL")
+        val now = Instant.now()
+        val aliceTask = Task(startTime = now.minusSeconds(3600), endTime = now, owner = alice, projects = mutableSetOf(p))
+        val bobTask = Task(startTime = now.minusSeconds(1800), endTime = now, owner = bob, projects = mutableSetOf(p))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(aliceTask, bobTask))
+
+        val result = service.getById("alice", p.id)
+
+        // usedSeconds should include BOTH alice and bob's tasks (≥ 5399s)
+        assertTrue(result.usedSeconds >= 5399L)
+        // budgetPercent should be > 100% for 7200s budget with > 5400s used
+        assertTrue(result.budgetPercent != null && result.budgetPercent!! >= 74.0)
+    }
 }

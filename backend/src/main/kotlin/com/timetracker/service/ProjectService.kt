@@ -18,9 +18,12 @@ import com.timetracker.repository.UserRepository
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 import java.util.UUID
 
 private const val MAX_DEPTH = 5
@@ -38,7 +41,10 @@ class ProjectService(
         val owned = projectRepository.findAllByOwner(user)
         val memberRootProjects = memberRepository.findAllByUser(user).map { it.project }
         val memberSubtrees = memberRootProjects.flatMap { collectSubtree(it) }
-        return (owned + memberSubtrees).distinctBy { it.id }.map { it.toResponse() }
+        return (owned + memberSubtrees).distinctBy { it.id }.map { project ->
+            val usedSeconds = if (project.budgetPeriod != null) computeUsedSeconds(project) else 0L
+            project.toResponse(usedSeconds = usedSeconds)
+        }
     }
 
     fun create(
@@ -49,6 +55,7 @@ class ProjectService(
         val parent = request.parentId?.let { requireProjectOwner(it, owner) }
         checkDepth(parent)
         checkNameUnique(owner.username, request.name, parent)
+        validateBudget(request.budgetSeconds, request.budgetPeriod)
         val project =
             Project(
                 name = request.name,
@@ -56,6 +63,8 @@ class ProjectService(
                 color = request.color,
                 parent = parent,
                 owner = owner,
+                budgetSeconds = request.budgetSeconds,
+                budgetPeriod = request.budgetPeriod,
             )
         return projectRepository.save(project).toResponse()
     }
@@ -69,7 +78,8 @@ class ProjectService(
         val user = requireUser(username)
         val project = requireProjectAccess(id, user)
         val (totalSeconds, userBreakdown) = computeAggregation(project, from, to)
-        return project.toResponse(totalSeconds, userBreakdown)
+        val usedSeconds = if (project.budgetPeriod != null) computeUsedSeconds(project) else 0L
+        return project.toResponse(totalSeconds, userBreakdown, usedSeconds)
     }
 
     fun update(
@@ -82,9 +92,12 @@ class ProjectService(
         if (project.name != request.name) {
             checkNameUnique(user.username, request.name, project.parent)
         }
+        validateBudget(request.budgetSeconds, request.budgetPeriod)
         project.name = request.name
         project.description = request.description
         project.color = request.color
+        project.budgetSeconds = request.budgetSeconds
+        project.budgetPeriod = request.budgetPeriod
         return projectRepository.save(project).toResponse()
     }
 
@@ -350,6 +363,55 @@ class ProjectService(
         return value
     }
 
+    private fun validateBudget(
+        budgetSeconds: Long?,
+        budgetPeriod: String?,
+    ) {
+        val hasSeconds = budgetSeconds != null
+        val hasPeriod = budgetPeriod != null
+        if (hasSeconds != hasPeriod) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "budgetSeconds and budgetPeriod must both be set or both be absent",
+            )
+        }
+    }
+
+    fun computeUsedSeconds(project: Project): Long {
+        val now = Instant.now()
+        val zonedNow = now.atZone(ZoneOffset.UTC)
+        val (from, to) =
+            when (project.budgetPeriod) {
+                "TOTAL" -> Pair(null, null)
+                "WEEKLY" -> {
+                    val weekStart =
+                        zonedNow
+                            .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                            .truncatedTo(ChronoUnit.DAYS)
+                            .toInstant()
+                    val weekEnd = weekStart.plus(7, ChronoUnit.DAYS)
+                    Pair(weekStart, weekEnd)
+                }
+                "MONTHLY" -> {
+                    val monthStart = zonedNow.withDayOfMonth(1).truncatedTo(ChronoUnit.DAYS).toInstant()
+                    val monthEnd = monthStart.atZone(ZoneOffset.UTC).plusMonths(1).toInstant()
+                    Pair(monthStart, monthEnd)
+                }
+                else -> return 0L
+            }
+        val subtree = collectSubtree(project)
+        val tasks =
+            if (from != null && to != null) {
+                taskRepository.findAllByProjectsInAndTimeRange(subtree, from, to)
+            } else {
+                taskRepository.findAllByProjectsIn(subtree)
+            }
+        return tasks.sumOf { task ->
+            val end = task.endTime ?: now
+            (end.epochSecond - task.startTime.epochSecond).coerceAtLeast(0)
+        }
+    }
+
     private fun computeAggregation(
         project: Project,
         from: Instant?,
@@ -380,8 +442,15 @@ class ProjectService(
 fun Project.toResponse(
     totalSeconds: Long = 0,
     userBreakdown: List<UserTimeBreakdown> = emptyList(),
-): ProjectResponse =
-    ProjectResponse(
+    usedSeconds: Long = 0,
+): ProjectResponse {
+    val budgetPercent =
+        if (budgetSeconds != null && budgetSeconds!! > 0) {
+            usedSeconds.toDouble() / budgetSeconds!! * 100.0
+        } else {
+            null
+        }
+    return ProjectResponse(
         id = id,
         name = name,
         description = description,
@@ -392,7 +461,12 @@ fun Project.toResponse(
         createdAt = createdAt,
         totalSeconds = totalSeconds,
         userBreakdown = userBreakdown,
+        budgetSeconds = budgetSeconds,
+        budgetPeriod = budgetPeriod,
+        usedSeconds = usedSeconds,
+        budgetPercent = budgetPercent,
     )
+}
 
 fun ProjectMember.toMemberResponse(inherited: Boolean = false): MemberResponse =
     MemberResponse(

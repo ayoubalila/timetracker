@@ -72,4 +72,38 @@ describe('ProjectTree', () => {
     const spans = document.querySelectorAll('[style*="background-color"]')
     expect(spans.length).toBeGreaterThan(0)
   })
+
+  // ── M9B: budget bars ─────────────────────────────────────────────────────
+
+  it('shows budget bar when budgetPercent is set', () => {
+    const budgetProject: ProjectResponse = { ...root, budgetPercent: 50, budgetSeconds: 3600, budgetPeriod: 'TOTAL', usedSeconds: 1800 }
+    render(<ProjectTree projects={[budgetProject]} />)
+    expect(screen.getByTestId('budget-bar-1')).toBeTruthy()
+  })
+
+  it('does not show budget bar when budgetPercent is null', () => {
+    render(<ProjectTree projects={[root]} />)
+    expect(screen.queryByTestId('budget-bar-1')).toBeNull()
+  })
+
+  it('budget bar has blue fill at 50% (< 80)', () => {
+    const p: ProjectResponse = { ...root, budgetPercent: 50, budgetSeconds: 3600, budgetPeriod: 'TOTAL', usedSeconds: 1800 }
+    render(<ProjectTree projects={[p]} />)
+    const bar = screen.getByTestId('budget-bar-1').querySelector('.bg-blue-500')
+    expect(bar).not.toBeNull()
+  })
+
+  it('budget bar has yellow fill at 85% (≥ 80, < 100)', () => {
+    const p: ProjectResponse = { ...root, budgetPercent: 85, budgetSeconds: 3600, budgetPeriod: 'TOTAL', usedSeconds: 3060 }
+    render(<ProjectTree projects={[p]} />)
+    const bar = screen.getByTestId('budget-bar-1').querySelector('.bg-yellow-400')
+    expect(bar).not.toBeNull()
+  })
+
+  it('budget bar has red fill at 110% (≥ 100)', () => {
+    const p: ProjectResponse = { ...root, budgetPercent: 110, budgetSeconds: 3600, budgetPeriod: 'TOTAL', usedSeconds: 3960 }
+    render(<ProjectTree projects={[p]} />)
+    const bar = screen.getByTestId('budget-bar-1').querySelector('.bg-red-500')
+    expect(bar).not.toBeNull()
+  })
 })

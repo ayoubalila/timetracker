@@ -38,17 +38,35 @@ function ProjectNode({ project, children, allProjects, onSelect, selectedId, dep
           <span className="w-4 h-4 flex-shrink-0" />
         )}
         <span
-          className="truncate flex-1"
+          className="truncate flex-1 min-w-0"
           onClick={() => onSelect?.(project)}
           data-testid={`project-node-${project.id}`}
         >
-          {project.color && (
-            <span
-              className="inline-block w-2 h-2 rounded-full mr-1"
-              style={{ backgroundColor: project.color }}
-            />
+          <span className="flex items-center gap-1">
+            {project.color && (
+              <span
+                className="inline-block w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: project.color }}
+              />
+            )}
+            <span className="truncate">{project.name}</span>
+          </span>
+          {project.budgetPercent != null && (
+            <span className="block mt-0.5" data-testid={`budget-bar-${project.id}`}>
+              <span className="block w-full h-1 rounded-full bg-gray-200 overflow-hidden">
+                <span
+                  className={`block h-1 rounded-full transition-all ${
+                    project.budgetPercent >= 100
+                      ? 'bg-red-500'
+                      : project.budgetPercent >= 80
+                        ? 'bg-yellow-400'
+                        : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${Math.min(100, project.budgetPercent)}%` }}
+                />
+              </span>
+            </span>
           )}
-          {project.name}
         </span>
       </div>
       {hasChildren && expanded && (

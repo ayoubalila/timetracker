@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { LiveTimer } from '../components/LiveTimer'
@@ -17,7 +17,7 @@ import {
   getOverviewMonth,
 } from '../api/tasks'
 import { listTags } from '../api/tags'
-import { listProjects } from '../api/projects'
+import { listProjects, getProject } from '../api/projects'
 import { logoutApi } from '../api/auth'
 import { ApiError } from '../api/client'
 import { toast } from '../lib/toast'
@@ -73,6 +73,8 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
   const [sortKey, setSortKey] = useState<SortKey>('startTime')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [filterTagId, setFilterTagId] = useState<string | null>(null)
+  const [budgetAlerts, setBudgetAlerts] = useState<{ name: string; percent: number; exceeded: boolean }[]>([])
+  const preStopProjectIds = useRef<string[]>([])
 
   const { data: currentTaskData, isLoading: currentTaskLoading } = useQuery({
     queryKey: ['current-task'],
@@ -178,6 +180,18 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
       queryClient.invalidateQueries({ queryKey: ['overview-day'] })
       queryClient.invalidateQueries({ queryKey: ['overview-week'] })
       queryClient.invalidateQueries({ queryKey: ['overview-month'] })
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      const projectIds = preStopProjectIds.current
+      if (projectIds.length > 0) {
+        Promise.all(projectIds.map((pid) => getProject(pid)))
+          .then((details) => {
+            const alerts = details
+              .filter((d) => d.budgetPercent != null && d.budgetPercent >= 80)
+              .map((d) => ({ name: d.name, percent: Math.round(d.budgetPercent!), exceeded: d.budgetPercent! >= 100 }))
+            if (alerts.length > 0) setBudgetAlerts(alerts)
+          })
+          .catch(() => {})
+      }
     },
     onError: (err: Error) => toast(err.message || 'Failed to stop task'),
   })
@@ -227,6 +241,7 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
       if (e.code === 'Space') {
         e.preventDefault()
         if (currentTask) {
+          preStopProjectIds.current = currentTask.projectIds ?? []
           stopMutation.mutate(currentTask.id)
         } else if (!showStartForm) {
           setShowStartForm(true)
@@ -321,7 +336,10 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
               <LiveTimer startTime={currentTask.startTime} />
               <button
                 data-testid="stop-button"
-                onClick={() => stopMutation.mutate(currentTask.id)}
+                onClick={() => {
+                  preStopProjectIds.current = currentTask.projectIds ?? []
+                  stopMutation.mutate(currentTask.id)
+                }}
                 disabled={stopMutation.isPending}
                 className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
               >
@@ -412,6 +430,39 @@ export function DashboardPage({ username, onLogout, timezone }: DashboardPagePro
             </div>
           )}
         </section>
+
+        {/* Budget alerts after stopping a task */}
+        {budgetAlerts.length > 0 && (
+          <div className="mb-4 space-y-2" data-testid="budget-alerts">
+            {budgetAlerts.map((alert) => (
+              <div
+                key={alert.name}
+                data-testid={`budget-alert-${alert.exceeded ? 'exceeded' : 'warning'}`}
+                className={`rounded-lg border px-4 py-3 flex items-center justify-between text-sm ${
+                  alert.exceeded
+                    ? 'bg-red-50 border-red-300 text-red-800'
+                    : 'bg-yellow-50 border-yellow-300 text-yellow-800'
+                }`}
+              >
+                <span>
+                  {alert.exceeded ? '🔴' : '🟡'}{' '}
+                  <strong>{alert.name}</strong>:{' '}
+                  {alert.exceeded
+                    ? `Budget exceeded (${alert.percent}% used)`
+                    : `Approaching budget limit (${alert.percent}% used)`}
+                </span>
+                <button
+                  onClick={() => setBudgetAlerts((prev) => prev.filter((a) => a.name !== alert.name))}
+                  className="ml-4 text-current opacity-60 hover:opacity-100"
+                  aria-label="Dismiss"
+                  data-testid="budget-alert-dismiss"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Task overview tabs */}
         <section>

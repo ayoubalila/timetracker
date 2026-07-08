@@ -709,4 +709,356 @@ describe('ProjectsPage', () => {
     await waitFor(() => screen.getByTestId(`proj-task-tag-pt1-tag1`))
     expect(screen.getByText('Bug')).toBeTruthy()
   })
+
+  // ── M9B: time budgets ────────────────────────────────────────────────────
+
+  const budgetProject: ProjectResponse = {
+    ...project,
+    budgetSeconds: 3600,
+    budgetPeriod: 'TOTAL',
+    usedSeconds: 1800,
+    budgetPercent: 50,
+  }
+
+  function stubWithBudget(detail: ProjectResponse) {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => detail })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [{ ...project, budgetPercent: detail.budgetPercent }] })
+    }))
+  }
+
+  it('shows budget progress bar when project has a budget', async () => {
+    stubWithBudget(budgetProject)
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByTestId('budget-section')).toBeTruthy())
+    expect(screen.getByTestId('budget-progress-bar')).toBeTruthy()
+    expect(screen.getByTestId('budget-percent').textContent).toContain('50%')
+  })
+
+  it('does not show budget section when no budget set', async () => {
+    stubWithTasks([])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('project-detail'))
+    expect(screen.queryByTestId('budget-section')).toBeNull()
+  })
+
+  it('shows yellow warning alert at ≥80% and <100%', async () => {
+    stubWithBudget({ ...budgetProject, usedSeconds: 2900, budgetPercent: 80.5 })
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByTestId('budget-warning-alert')).toBeTruthy())
+    expect(screen.queryByTestId('budget-exceeded-alert')).toBeNull()
+  })
+
+  it('shows red exceeded alert at ≥100%', async () => {
+    stubWithBudget({ ...budgetProject, usedSeconds: 7200, budgetPercent: 200 })
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByTestId('budget-exceeded-alert')).toBeTruthy())
+    expect(screen.queryByTestId('budget-warning-alert')).toBeNull()
+  })
+
+  it('shows budget-edit-button for project owner', async () => {
+    stubWithBudget(budgetProject)
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByTestId('budget-edit-button')).toBeTruthy())
+  })
+
+  it('clicking budget-edit-button shows budget form', async () => {
+    stubWithBudget(budgetProject)
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('budget-edit-button'))
+    fireEvent.click(screen.getByTestId('budget-edit-button'))
+    expect(screen.getByTestId('budget-form')).toBeTruthy()
+    expect(screen.getByTestId('budget-hours-input')).toBeTruthy()
+    expect(screen.getByTestId('budget-period-select')).toBeTruthy()
+  })
+
+  it('budget form cancel hides the form', async () => {
+    stubWithBudget(budgetProject)
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('budget-edit-button'))
+    fireEvent.click(screen.getByTestId('budget-edit-button'))
+    fireEvent.click(screen.getByTestId('budget-cancel-button'))
+    expect(screen.queryByTestId('budget-form')).toBeNull()
+  })
+
+  it('budget form submits with valid hours and period', async () => {
+    const saveSpy = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === 'PUT' && url.includes('/projects/')) {
+        saveSpy()
+        return Promise.resolve({ ok: true, status: 200, json: async () => budgetProject })
+      }
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => budgetProject })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('budget-edit-button'))
+    fireEvent.click(screen.getByTestId('budget-edit-button'))
+    fireEvent.change(screen.getByTestId('budget-hours-input'), { target: { value: '10' } })
+    fireEvent.change(screen.getByTestId('budget-period-select'), { target: { value: 'WEEKLY' } })
+    fireEvent.submit(screen.getByTestId('budget-form'))
+
+    await waitFor(() => expect(saveSpy).toHaveBeenCalled())
+  })
+
+  it('budget form shows error when hours is empty', async () => {
+    stubWithBudget(budgetProject)
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('budget-edit-button'))
+    fireEvent.click(screen.getByTestId('budget-edit-button'))
+    fireEvent.submit(screen.getByTestId('budget-form'))
+    expect(screen.getByTestId('budget-form-error')).toBeTruthy()
+  })
+
+  it('shows Set time budget link when no budget set yet', async () => {
+    stubWithTasks([])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByTestId('budget-edit-button')).toBeTruthy())
+    expect(screen.getByTestId('budget-edit-button').textContent).toContain('Set time budget')
+  })
+
+  it('shows Remove button in budget form when budget already set', async () => {
+    stubWithBudget(budgetProject)
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('budget-edit-button'))
+    fireEvent.click(screen.getByTestId('budget-edit-button'))
+    expect(screen.getByTestId('budget-clear-button')).toBeTruthy()
+  })
+
+  it('clear budget button sends PUT with null budgetSeconds and budgetPeriod', async () => {
+    const saveSpy = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === 'PUT' && url.includes('/projects/')) {
+        saveSpy(JSON.parse(opts.body as string))
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...budgetProject, budgetSeconds: null, budgetPeriod: null }) })
+      }
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => budgetProject })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('budget-edit-button'))
+    fireEvent.click(screen.getByTestId('budget-edit-button'))
+    fireEvent.click(screen.getByTestId('budget-clear-button'))
+    await waitFor(() => expect(saveSpy).toHaveBeenCalled())
+    const body = saveSpy.mock.calls[0][0]
+    expect(body.budgetSeconds).toBeNull()
+    expect(body.budgetPeriod).toBeNull()
+  })
+
+  it('budget API error shows error message in budget form', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === 'PUT' && url.includes('/projects/'))
+        return Promise.resolve({ ok: false, status: 400, text: async () => 'Budget invalid' })
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => budgetProject })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('budget-edit-button'))
+    fireEvent.click(screen.getByTestId('budget-edit-button'))
+    fireEvent.change(screen.getByTestId('budget-hours-input'), { target: { value: '5' } })
+    fireEvent.submit(screen.getByTestId('budget-form'))
+    await waitFor(() => expect(screen.getByTestId('budget-form-error').textContent).toContain('Budget invalid'))
+  })
+
+  it('shows correct 409 error text for duplicate project name', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/tags')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url === '/api/projects' && opts?.method === 'POST')
+        return Promise.resolve({ ok: false, status: 409, text: async () => 'conflict' })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('new-project-button'))
+    fireEvent.click(screen.getByTestId('new-project-button'))
+    fireEvent.change(screen.getByTestId('create-name-input'), { target: { value: 'Work' } })
+    fireEvent.click(screen.getByTestId('create-submit'))
+    await waitFor(() => expect(screen.getByTestId('form-error')).toBeTruthy())
+    expect(screen.getByTestId('form-error').textContent).toContain('already exists')
+  })
+
+  it('date-to input updates the date range filter', async () => {
+    mockFetch([project])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('date-to'))
+    fireEvent.change(screen.getByTestId('date-to'), { target: { value: '2026-06-30' } })
+    await waitFor(() => expect(screen.getByTestId('clear-date-range')).toBeTruthy())
+  })
+
+  it('shows per-user breakdown when project has multiple contributors', async () => {
+    const multiUserBreakdown = [
+      { userId: 'u1', username: 'alice', seconds: 1800 },
+      { userId: 'u2', username: 'bob', seconds: 900 },
+    ]
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [{ userId: 'u2', username: 'bob', role: 'MEMBER', inherited: false }] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 2700, userBreakdown: multiUserBreakdown }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByTestId('user-breakdown')).toBeTruthy())
+    expect(screen.getByTestId('breakdown-alice')).toBeTruthy()
+    expect(screen.getByTestId('breakdown-bob')).toBeTruthy()
+  })
+
+  it('invite username input updates value and form submit calls invite API', async () => {
+    const inviteSpy = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members') && opts?.method === 'POST') {
+        inviteSpy()
+        return Promise.resolve({ ok: true, status: 204 })
+      }
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 0 }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('invite-form'))
+    fireEvent.change(screen.getByTestId('invite-username-input'), { target: { value: 'charlie' } })
+    fireEvent.submit(screen.getByTestId('invite-form'))
+    await waitFor(() => expect(inviteSpy).toHaveBeenCalled())
+  })
+
+  it('invite form with empty username does not call API', async () => {
+    const inviteSpy = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members') && opts?.method === 'POST') {
+        inviteSpy()
+        return Promise.resolve({ ok: true, status: 204 })
+      }
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 0 }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('invite-form'))
+    // submit with empty username
+    fireEvent.submit(screen.getByTestId('invite-form'))
+    expect(inviteSpy).not.toHaveBeenCalled()
+  })
+
+  it('remove member button calls remove API', async () => {
+    const removeSpy = vi.fn()
+    const bobMember = { userId: 'u2', username: 'bob', role: 'MEMBER', inherited: false }
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members/u2') && opts?.method === 'DELETE') {
+        removeSpy()
+        return Promise.resolve({ ok: true, status: 204 })
+      }
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [bobMember] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 0 }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('remove-member-bob'))
+    fireEvent.click(screen.getByTestId('remove-member-bob'))
+    await waitFor(() => expect(removeSpy).toHaveBeenCalled())
+  })
 })
