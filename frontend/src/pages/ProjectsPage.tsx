@@ -62,9 +62,15 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newName, setNewName] = useState('')
   const [newParentId, setNewParentId] = useState<string | null>(null)
+  const [newBudgetHours, setNewBudgetHours] = useState('')
+  const [newBudgetPeriod, setNewBudgetPeriod] = useState('')
   const [editingProject, setEditingProject] = useState<ProjectResponse | null>(null)
   const [editName, setEditName] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
+  const [editBudgetHours, setEditBudgetHours] = useState('')
+  const [editBudgetPeriod, setEditBudgetPeriod] = useState<string>('')
+  const [showBudgetEdit, setShowBudgetEdit] = useState(false)
+  const [budgetError, setBudgetError] = useState<string | null>(null)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('startTime')
@@ -128,20 +134,46 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
       setShowCreateForm(false)
       setNewName('')
       setNewParentId(null)
+      setNewBudgetHours('')
+      setNewBudgetPeriod('')
       setFormError(null)
     },
     onError: (err: Error) => setFormError(projectErrorMessage(err)),
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      updateProject(id, { name, description: editingProject?.description, color: editingProject?.color }),
+    mutationFn: ({ id, name, budgetSeconds, budgetPeriod }: { id: string; name: string; budgetSeconds?: number | null; budgetPeriod?: string | null }) =>
+      updateProject(id, {
+        name,
+        description: editingProject?.description,
+        color: editingProject?.color,
+        budgetSeconds: budgetSeconds !== undefined ? budgetSeconds : editingProject?.budgetSeconds,
+        budgetPeriod: budgetPeriod !== undefined ? budgetPeriod : editingProject?.budgetPeriod,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       setEditingProject(null)
       setFormError(null)
     },
     onError: (err: Error) => setFormError(projectErrorMessage(err)),
+  })
+
+  const budgetMutation = useMutation({
+    mutationFn: ({ id, budgetSeconds, budgetPeriod }: { id: string; budgetSeconds: number | null; budgetPeriod: string | null }) =>
+      updateProject(id, {
+        name: selectedProject?.name ?? '',
+        description: selectedProject?.description,
+        color: selectedProject?.color,
+        budgetSeconds,
+        budgetPeriod,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: ['project-detail', selectedProjectId] })
+      setShowBudgetEdit(false)
+      setBudgetError(null)
+    },
+    onError: (err: Error) => setBudgetError(err.message),
   })
 
   const deleteMutation = useMutation({
@@ -179,18 +211,42 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
   function handleCreateSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!newName.trim()) return
-    createMutation.mutate({ name: newName.trim(), parentId: newParentId })
+    const hours = parseFloat(newBudgetHours)
+    const hasBudget = newBudgetHours !== '' && newBudgetPeriod !== ''
+    if (newBudgetHours !== '' && (!newBudgetPeriod || isNaN(hours) || hours <= 0)) {
+      setFormError('Enter a valid number of hours and select a period.')
+      return
+    }
+    createMutation.mutate({
+      name: newName.trim(),
+      parentId: newParentId,
+      budgetSeconds: hasBudget ? Math.round(hours * 3600) : null,
+      budgetPeriod: hasBudget ? newBudgetPeriod : null,
+    })
   }
 
   function handleEditSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!editingProject || !editName.trim()) return
-    updateMutation.mutate({ id: editingProject.id, name: editName.trim() })
+    const hours = parseFloat(editBudgetHours)
+    const hasBudget = editBudgetHours !== '' && editBudgetPeriod !== ''
+    if (editBudgetHours !== '' && (!editBudgetPeriod || isNaN(hours) || hours <= 0)) {
+      setFormError('Enter a valid number of hours and select a period.')
+      return
+    }
+    updateMutation.mutate({
+      id: editingProject.id,
+      name: editName.trim(),
+      budgetSeconds: hasBudget ? Math.round(hours * 3600) : null,
+      budgetPeriod: hasBudget ? editBudgetPeriod : null,
+    })
   }
 
   function startEdit(project: ProjectResponse) {
     setEditingProject(project)
     setEditName(project.name)
+    setEditBudgetHours(project.budgetSeconds ? (project.budgetSeconds / 3600).toFixed(1) : '')
+    setEditBudgetPeriod(project.budgetPeriod ?? '')
     setFormError(null)
   }
 
@@ -207,6 +263,38 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
     setFilterUserId(null)
     setFilterTagId(null)
     setExportMonth('')
+    setShowBudgetEdit(false)
+    setBudgetError(null)
+  }
+
+  function handleBudgetSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedProject) return
+    const hours = parseFloat(editBudgetHours)
+    if (!editBudgetPeriod || isNaN(hours) || hours <= 0) {
+      setBudgetError('Enter a valid number of hours and select a period.')
+      return
+    }
+    budgetMutation.mutate({
+      id: selectedProject.id,
+      budgetSeconds: Math.round(hours * 3600),
+      budgetPeriod: editBudgetPeriod,
+    })
+  }
+
+  function handleClearBudget() {
+    if (!selectedProject) return
+    budgetMutation.mutate({ id: selectedProject.id, budgetSeconds: null, budgetPeriod: null })
+  }
+
+  function startBudgetEdit() {
+    if (!selectedProject) return
+    setEditBudgetHours(
+      selectedProject.budgetSeconds ? (selectedProject.budgetSeconds / 3600).toFixed(1) : ''
+    )
+    setEditBudgetPeriod(selectedProject.budgetPeriod ?? 'TOTAL')
+    setShowBudgetEdit(true)
+    setBudgetError(null)
   }
 
   function handleClearDateRange() {
@@ -305,6 +393,32 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Time budget (optional)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="0.1"
+                      step="0.5"
+                      placeholder="Hours"
+                      value={newBudgetHours}
+                      onChange={(e) => setNewBudgetHours(e.target.value)}
+                      className="w-24 border rounded px-2 py-1.5 text-sm"
+                      data-testid="create-budget-hours-input"
+                    />
+                    <select
+                      value={newBudgetPeriod}
+                      onChange={(e) => setNewBudgetPeriod(e.target.value)}
+                      className="flex-1 border rounded px-2 py-1.5 text-sm"
+                      data-testid="create-budget-period-select"
+                    >
+                      <option value="">— Period —</option>
+                      <option value="TOTAL">Total (all time)</option>
+                      <option value="WEEKLY">Weekly</option>
+                      <option value="MONTHLY">Monthly</option>
+                    </select>
+                  </div>
+                </div>
                 {formError && (
                   <p className="text-red-600 text-sm" data-testid="form-error">
                     {formError}
@@ -323,6 +437,8 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                     type="button"
                     onClick={() => {
                       setShowCreateForm(false)
+                      setNewBudgetHours('')
+                      setNewBudgetPeriod('')
                       setFormError(null)
                     }}
                     className="px-4 py-2 rounded text-sm border"
@@ -338,7 +454,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
           {/* Edit form */}
           {editingProject && (
             <div className="bg-white rounded-lg border p-4 mb-6 max-w-md" data-testid="edit-form">
-              <h3 className="font-medium mb-3">Rename Project</h3>
+              <h3 className="font-medium mb-3">Edit Project</h3>
               <form onSubmit={handleEditSubmit} className="space-y-3">
                 <input
                   type="text"
@@ -349,7 +465,33 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                   className="w-full border rounded px-3 py-2 text-sm"
                   data-testid="edit-name-input"
                 />
-                {formError && <p className="text-red-600 text-sm">{formError}</p>}
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Time budget (optional)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="0.1"
+                      step="0.5"
+                      placeholder="Hours"
+                      value={editBudgetHours}
+                      onChange={(e) => setEditBudgetHours(e.target.value)}
+                      className="w-24 border rounded px-2 py-1.5 text-sm"
+                      data-testid="edit-budget-hours-input"
+                    />
+                    <select
+                      value={editBudgetPeriod}
+                      onChange={(e) => setEditBudgetPeriod(e.target.value)}
+                      className="flex-1 border rounded px-2 py-1.5 text-sm"
+                      data-testid="edit-budget-period-select"
+                    >
+                      <option value="">— No budget —</option>
+                      <option value="TOTAL">Total (all time)</option>
+                      <option value="WEEKLY">Weekly</option>
+                      <option value="MONTHLY">Monthly</option>
+                    </select>
+                  </div>
+                </div>
+                {formError && <p className="text-red-600 text-sm" data-testid="edit-form-error">{formError}</p>}
                 <div className="flex gap-2">
                   <button
                     type="submit"
@@ -439,6 +581,130 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                     {formatDuration(selectedDetail?.totalSeconds ?? 0)}
                   </span>
                 </div>
+
+                {/* Budget progress */}
+                {selectedDetail?.budgetSeconds != null && (
+                  <div className="mt-3" data-testid="budget-section">
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                      <span>
+                        Budget ({selectedDetail.budgetPeriod?.toLowerCase()}):{' '}
+                        <span className="font-medium">
+                          {formatDuration(selectedDetail.usedSeconds ?? 0)}
+                        </span>
+                        {' / '}
+                        {formatDuration(selectedDetail.budgetSeconds)}
+                      </span>
+                      <span
+                        className={`font-semibold ${
+                          (selectedDetail.budgetPercent ?? 0) >= 100
+                            ? 'text-red-600'
+                            : (selectedDetail.budgetPercent ?? 0) >= 80
+                              ? 'text-yellow-600'
+                              : 'text-blue-600'
+                        }`}
+                        data-testid="budget-percent"
+                      >
+                        {Math.round(selectedDetail.budgetPercent ?? 0)}%
+                      </span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-gray-200 overflow-hidden" data-testid="budget-progress-bar">
+                      <div
+                        className={`h-2 rounded-full transition-all ${
+                          (selectedDetail.budgetPercent ?? 0) >= 100
+                            ? 'bg-red-500'
+                            : (selectedDetail.budgetPercent ?? 0) >= 80
+                              ? 'bg-yellow-400'
+                              : 'bg-blue-500'
+                        }`}
+                        style={{ width: `${Math.min(100, selectedDetail.budgetPercent ?? 0)}%` }}
+                      />
+                    </div>
+                    {(selectedDetail.budgetPercent ?? 0) >= 100 && (
+                      <p className="text-xs text-red-600 mt-1 font-medium" data-testid="budget-exceeded-alert">
+                        Budget exceeded — consider adjusting your workload.
+                      </p>
+                    )}
+                    {(selectedDetail.budgetPercent ?? 0) >= 80 && (selectedDetail.budgetPercent ?? 0) < 100 && (
+                      <p className="text-xs text-yellow-600 mt-1" data-testid="budget-warning-alert">
+                        Approaching budget limit.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Budget editing */}
+                {isOwner && (
+                  <div className="mt-3">
+                    {!showBudgetEdit ? (
+                      <button
+                        onClick={startBudgetEdit}
+                        className="text-xs text-gray-400 hover:text-gray-600 underline"
+                        data-testid="budget-edit-button"
+                      >
+                        {selectedDetail?.budgetSeconds != null ? 'Edit budget' : 'Set time budget'}
+                      </button>
+                    ) : (
+                      <form onSubmit={handleBudgetSubmit} className="flex flex-wrap items-end gap-2 mt-1" data-testid="budget-form">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-0.5">Hours</label>
+                          <input
+                            type="number"
+                            min="0.1"
+                            step="0.5"
+                            value={editBudgetHours}
+                            onChange={(e) => setEditBudgetHours(e.target.value)}
+                            className="w-24 border rounded px-2 py-1 text-sm"
+                            placeholder="e.g. 10"
+                            data-testid="budget-hours-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-0.5">Period</label>
+                          <select
+                            value={editBudgetPeriod}
+                            onChange={(e) => setEditBudgetPeriod(e.target.value)}
+                            className="border rounded px-2 py-1 text-sm"
+                            data-testid="budget-period-select"
+                          >
+                            <option value="TOTAL">Total (all time)</option>
+                            <option value="WEEKLY">Weekly</option>
+                            <option value="MONTHLY">Monthly</option>
+                          </select>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={budgetMutation.isPending}
+                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
+                          data-testid="budget-save-button"
+                        >
+                          Save
+                        </button>
+                        {selectedDetail?.budgetSeconds != null && (
+                          <button
+                            type="button"
+                            onClick={handleClearBudget}
+                            disabled={budgetMutation.isPending}
+                            className="px-3 py-1 rounded text-sm border text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            data-testid="budget-clear-button"
+                          >
+                            Remove
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => { setShowBudgetEdit(false); setBudgetError(null) }}
+                          className="px-3 py-1 rounded text-sm border"
+                          data-testid="budget-cancel-button"
+                        >
+                          Cancel
+                        </button>
+                        {budgetError && (
+                          <p className="w-full text-xs text-red-600" data-testid="budget-form-error">{budgetError}</p>
+                        )}
+                      </form>
+                    )}
+                  </div>
+                )}
 
                 {/* Per-user breakdown (shared projects) */}
                 {selectedDetail && Array.isArray(selectedDetail.userBreakdown) && selectedDetail.userBreakdown.length > 1 && (

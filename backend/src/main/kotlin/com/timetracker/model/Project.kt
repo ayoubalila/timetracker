@@ -29,4 +29,8 @@ class Project(
     val owner: User,
     @Column(nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
+    @Column(name = "budget_seconds")
+    var budgetSeconds: Long? = null,
+    @Column(name = "budget_period", length = 20)
+    var budgetPeriod: String? = null,
 )

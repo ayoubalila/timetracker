@@ -15,6 +15,10 @@ export interface ProjectResponse {
   createdAt: string
   totalSeconds: number
   userBreakdown: UserTimeBreakdown[]
+  budgetSeconds?: number | null
+  budgetPeriod?: string | null
+  usedSeconds?: number
+  budgetPercent?: number | null
 }
 
 export interface MemberResponse {
@@ -29,10 +33,14 @@ export interface CreateProjectRequest {
   description?: string | null
   color?: string | null
   parentId?: string | null
+  budgetSeconds?: number | null
+  budgetPeriod?: string | null
 }
 
 export interface UpdateProjectRequest {
   name: string
   description?: string | null
   color?: string | null
+  budgetSeconds?: number | null
+  budgetPeriod?: string | null
 }

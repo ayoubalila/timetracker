@@ -1,7 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { changePasswordApi, setTimezoneApi, logoutApi } from '../api/auth'
 import { ApiError } from '../api/client'
+import { listTags, createTag, deleteTag } from '../api/tags'
+
+const PRESET_COLORS = [
+  '#2563EB', '#059669', '#DC2626', '#D97706',
+  '#7C3AED', '#DB2777', '#0891B2', '#EA580C',
+  '#16A34A', '#6366F1', '#0D9488', '#9333EA',
+]
 
 interface SettingsPageProps {
   username: string
@@ -22,6 +30,33 @@ export function SettingsPage({ username, onLogout, timezone, onTimezoneChange }:
   const [tzError, setTzError] = useState<string | null>(null)
   const [tzSuccess, setTzSuccess] = useState<string | null>(null)
   const [tzLoading, setTzLoading] = useState(false)
+
+  const queryClient = useQueryClient()
+  const { data: tags = [] } = useQuery({ queryKey: ['tags'], queryFn: listTags })
+  const [newTagName, setNewTagName] = useState('')
+  const [newTagColor, setNewTagColor] = useState(PRESET_COLORS[0])
+  const [tagFormError, setTagFormError] = useState<string | null>(null)
+
+  const createTagMutation = useMutation({
+    mutationFn: createTag,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tags'] })
+      setNewTagName('')
+      setTagFormError(null)
+    },
+    onError: (err: Error) => setTagFormError(err.message),
+  })
+
+  const deleteTagMutation = useMutation({
+    mutationFn: deleteTag,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tags'] }),
+  })
+
+  function handleCreateTag(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newTagName.trim()) return
+    createTagMutation.mutate({ name: newTagName.trim(), color: newTagColor })
+  }
 
   function handleLogout() {
     logoutApi()
@@ -217,6 +252,106 @@ export function SettingsPage({ username, onLogout, timezone, onTimezoneChange }:
               className="w-full bg-blue-600 text-white py-2 rounded text-sm font-medium disabled:opacity-50"
             >
               {tzLoading ? 'Saving…' : 'Save timezone'}
+            </button>
+          </form>
+        </div>
+        <div className="bg-white rounded-lg border p-6 mt-6" data-testid="tags-section">
+          <h2 className="text-base font-medium mb-1">Personal Tags</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            Tags are personal — only you see them, even on shared projects.
+          </p>
+
+          {tags.length > 0 ? (
+            <div className="flex flex-wrap gap-2 mb-5 pb-5 border-b" data-testid="tags-list">
+              {tags.map((tag) => (
+                <span
+                  key={tag.id}
+                  data-testid={`tag-chip-${tag.id}`}
+                  className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-full text-sm font-medium text-white"
+                  style={{ backgroundColor: tag.color }}
+                >
+                  {tag.name}
+                  <button
+                    type="button"
+                    data-testid={`delete-tag-${tag.id}`}
+                    onClick={() => deleteTagMutation.mutate(tag.id)}
+                    disabled={deleteTagMutation.isPending}
+                    className="w-4 h-4 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 text-xs leading-none transition-colors disabled:opacity-50"
+                    aria-label={`Delete ${tag.name}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 mb-5 pb-5 border-b" data-testid="tags-empty">
+              No tags yet. Create one below.
+            </p>
+          )}
+
+          <form onSubmit={handleCreateTag} className="space-y-3" data-testid="tag-create-form">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tag name</label>
+              <input
+                type="text"
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                placeholder="e.g. Deep work, Client, Admin…"
+                maxLength={50}
+                className="w-full border rounded px-3 py-2 text-sm"
+                data-testid="tag-name-input"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
+              <div className="flex gap-2 flex-wrap">
+                {PRESET_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    data-testid={`color-swatch-${color.slice(1)}`}
+                    onClick={() => setNewTagColor(color)}
+                    className="w-7 h-7 rounded-full transition-all focus:outline-none"
+                    style={{
+                      backgroundColor: color,
+                      outline: newTagColor === color ? `3px solid ${color}` : 'none',
+                      outlineOffset: '2px',
+                      transform: newTagColor === color ? 'scale(1.2)' : 'scale(1)',
+                    }}
+                    aria-label={`Select color ${color}`}
+                    aria-pressed={newTagColor === color}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {newTagName.trim() && (
+              <div className="flex items-center gap-2" data-testid="tag-preview">
+                <span className="text-xs text-gray-500">Preview:</span>
+                <span
+                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white"
+                  style={{ backgroundColor: newTagColor }}
+                >
+                  {newTagName.trim()}
+                </span>
+              </div>
+            )}
+
+            {tagFormError && (
+              <p className="text-red-600 text-sm" data-testid="tag-form-error">
+                {tagFormError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={createTagMutation.isPending || !newTagName.trim()}
+              className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-50 hover:bg-blue-700"
+              data-testid="create-tag-submit"
+            >
+              {createTagMutation.isPending ? 'Adding…' : '+ Add tag'}
             </button>
           </form>
         </div>

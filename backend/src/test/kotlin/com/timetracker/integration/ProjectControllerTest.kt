@@ -1178,4 +1178,276 @@ class ProjectControllerTest {
         assert(csv.contains("Child task")) { "export should include subproject tasks" }
         assert(csv.contains("Work/SubProject")) { "project_path should show hierarchy" }
     }
+
+    // ── M9B: time budgets ─────────────────────────────────────────────────────
+
+    private fun createProjectWithBudget(
+        token: String,
+        name: String,
+        budgetSeconds: Long,
+        budgetPeriod: String,
+    ): UUID {
+        val result =
+            mockMvc
+                .post("/api/projects") {
+                    header("Authorization", "Bearer $token")
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        objectMapper.writeValueAsString(
+                            CreateProjectRequest(
+                                name = name,
+                                budgetSeconds = budgetSeconds,
+                                budgetPeriod = budgetPeriod,
+                            ),
+                        )
+                }.andExpect { status { isCreated() } }
+                .andReturn()
+        return UUID.fromString(objectMapper.readTree(result.response.contentAsString)["id"].asText())
+    }
+
+    @Test
+    fun `POST projects with budget fields - 201 returns budget fields`() {
+        val token = registerAndGetToken()
+        mockMvc
+            .post("/api/projects") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateProjectRequest(name = "Thesis", budgetSeconds = 36000L, budgetPeriod = "TOTAL"),
+                    )
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.budgetSeconds") { value(36000) }
+                jsonPath("$.budgetPeriod") { value("TOTAL") }
+                jsonPath("$.usedSeconds") { value(0) }
+                jsonPath("$.budgetPercent") { value(0.0) }
+            }
+    }
+
+    @Test
+    fun `POST projects - 400 when budgetSeconds set but budgetPeriod missing`() {
+        val token = registerAndGetToken()
+        mockMvc
+            .post("/api/projects") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        mapOf("name" to "Work", "budgetSeconds" to 3600),
+                    )
+            }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `POST projects - 400 when budgetPeriod is invalid value`() {
+        val token = registerAndGetToken()
+        mockMvc
+            .post("/api/projects") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        mapOf("name" to "Work", "budgetSeconds" to 3600, "budgetPeriod" to "DAILY"),
+                    )
+            }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `PUT projects updates budget fields`() {
+        val token = registerAndGetToken()
+        val id = createProject(token, "Work")
+        mockMvc
+            .put("/api/projects/$id") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        UpdateProjectRequest(name = "Work", budgetSeconds = 7200L, budgetPeriod = "WEEKLY"),
+                    )
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.budgetSeconds") { value(7200) }
+                jsonPath("$.budgetPeriod") { value("WEEKLY") }
+            }
+    }
+
+    @Test
+    fun `PUT projects - clears budget when null`() {
+        val token = registerAndGetToken()
+        val id = createProjectWithBudget(token, "Work", 7200L, "TOTAL")
+        mockMvc
+            .put("/api/projects/$id") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        UpdateProjectRequest(name = "Work"),
+                    )
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.budgetSeconds") { doesNotExist() }
+                jsonPath("$.budgetPeriod") { doesNotExist() }
+                jsonPath("$.budgetPercent") { doesNotExist() }
+            }
+    }
+
+    @Test
+    fun `GET projects id - budgetPercent reflects completed task duration`() {
+        val token = registerAndGetToken()
+        val id = createProjectWithBudget(token, "Work", 3600L, "TOTAL")
+        val now = Instant.now()
+        // Add a 30-minute task (50% of 3600s budget)
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Half-budget task",
+                            startTime = now.minusSeconds(1800),
+                            endTime = now,
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        mockMvc
+            .get("/api/projects/$id") { header("Authorization", "Bearer $token") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.budgetSeconds") { value(3600) }
+                jsonPath("$.budgetPeriod") { value("TOTAL") }
+                jsonPath("$.usedSeconds") { value(1800) }
+                // budgetPercent = 1800/3600*100 = 50.0
+                jsonPath("$.budgetPercent") { value(50.0) }
+            }
+    }
+
+    @Test
+    fun `GET projects id - budgetPercent is null when no budget set`() {
+        val token = registerAndGetToken()
+        val id = createProject(token, "NoBudget")
+
+        mockMvc
+            .get("/api/projects/$id") { header("Authorization", "Bearer $token") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.budgetPercent") { doesNotExist() }
+            }
+    }
+
+    @Test
+    fun `GET projects id - WEEKLY budget only counts tasks in current week`() {
+        val token = registerAndGetToken()
+        val id = createProjectWithBudget(token, "Work", 3600L, "WEEKLY")
+        val now = Instant.now()
+        // Add a task starting in the past (far past — should not be in current week)
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Old task",
+                            startTime = Instant.parse("2020-01-01T10:00:00Z"),
+                            endTime = Instant.parse("2020-01-01T11:00:00Z"),
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        // usedSeconds for WEEKLY should be 0 (old task not in this week)
+        mockMvc
+            .get("/api/projects/$id") { header("Authorization", "Bearer $token") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.budgetPeriod") { value("WEEKLY") }
+                jsonPath("$.usedSeconds") { value(0) }
+                jsonPath("$.budgetPercent") { value(0.0) }
+            }
+    }
+
+    @Test
+    fun `GET projects id - MONTHLY budget counts only tasks in current month`() {
+        val token = registerAndGetToken()
+        val id = createProjectWithBudget(token, "Work", 3600L, "MONTHLY")
+        val now = Instant.now()
+        // Add a task from current month
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "This month task",
+                            startTime = now.minusSeconds(1800),
+                            endTime = now,
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        mockMvc
+            .get("/api/projects/$id") { header("Authorization", "Bearer $token") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.budgetPeriod") { value("MONTHLY") }
+                jsonPath("$.usedSeconds") { value(1800) }
+            }
+    }
+
+    @Test
+    fun `GET projects id - shared project budget counts combined member time`() {
+        val aliceToken = registerAndGetToken("alice")
+        val bobToken = registerAndGetToken("bob")
+        val id = createProjectWithBudget(aliceToken, "Shared Work", 7200L, "TOTAL")
+        inviteUser(aliceToken, id, "bob")
+        val now = Instant.now()
+
+        // Alice adds a 1h task
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $aliceToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Alice task",
+                            startTime = now.minusSeconds(3600),
+                            endTime = now.minusSeconds(1800),
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        // Bob adds a 30min task
+        mockMvc
+            .post("/api/tasks") {
+                header("Authorization", "Bearer $bobToken")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateTaskRequest(
+                            description = "Bob task",
+                            startTime = now.minusSeconds(900),
+                            endTime = now,
+                            projectIds = listOf(id),
+                        ),
+                    )
+            }.andExpect { status { isCreated() } }
+
+        // usedSeconds should be alice's 1800s + bob's 900s = 2700s
+        // budgetPercent = 2700/7200*100 = 37.5
+        mockMvc
+            .get("/api/projects/$id") { header("Authorization", "Bearer $aliceToken") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.usedSeconds") { value(2700) }
+                jsonPath("$.budgetPercent") { value(37.5) }
+            }
+    }
 }

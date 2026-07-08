@@ -929,4 +929,167 @@ describe('DashboardPage', () => {
     // The task row should be visible with date info
     expect(screen.getByTestId('task-item-date-task')).toBeTruthy()
   })
+
+  it('short task (<1h) shows duration in minutes only', async () => {
+    const shortTask = {
+      id: 'short-1',
+      description: 'Quick fix',
+      startTime: new Date(Date.now() - 1800000).toISOString(), // 30 min ago
+      endTime: new Date().toISOString(),
+      projectIds: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    renderDashboard((url: string) => {
+      if (url.includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [shortTask] })
+    })
+    await waitFor(() => screen.getByTestId('task-item-short-1'))
+    const item = screen.getByTestId('task-item-short-1')
+    expect(item.textContent).toMatch(/\d+m/)
+    expect(item.textContent).not.toMatch(/\dh/)
+  })
+
+  it('cancels add-task form via cancel button', async () => {
+    renderDashboard()
+    await waitFor(() => screen.getByTestId('add-task-button'))
+    fireEvent.click(screen.getByTestId('add-task-button'))
+    expect(screen.getByTestId('task-form')).toBeTruthy()
+    fireEvent.click(screen.getByTestId('task-form-cancel'))
+    await waitFor(() => expect(screen.queryByTestId('task-form')).toBeNull())
+  })
+
+  it('shows tag chips on task rows when tasks have tags', async () => {
+    const taggedTask = {
+      id: 'tagged-1',
+      description: 'Tagged work',
+      startTime: '2026-06-29T09:00:00Z',
+      endTime: '2026-06-29T10:00:00Z',
+      projectIds: [],
+      tags: [{ id: 'tg1', name: 'Urgent', color: '#ff0000' }],
+      createdAt: '2026-06-29T09:00:00Z',
+      updatedAt: '2026-06-29T10:00:00Z',
+    }
+    renderDashboard((url: string) => {
+      if (url.includes('/current')) return Promise.resolve({ ok: true, status: 204 })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [taggedTask] })
+    })
+    await waitFor(() => screen.getByTestId('task-item-tagged-1'))
+    expect(screen.getByTestId('task-tag-tagged-1-tg1')).toBeTruthy()
+    expect(screen.getByTestId('task-tag-tagged-1-tg1').textContent).toBe('Urgent')
+  })
+
+  it('shows tag chips on current running task', async () => {
+    const runningTagged = {
+      id: 'run-tag',
+      description: 'Tagged running',
+      startTime: new Date(Date.now() - 60000).toISOString(),
+      endTime: null,
+      projectIds: [],
+      tags: [{ id: 'tg2', name: 'Focus', color: '#0000ff' }],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    renderDashboard((url: string) => {
+      if (url.includes('/current'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => runningTagged })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    await waitFor(() => screen.getByTestId('current-task-panel'))
+    expect(screen.getByText('Focus')).toBeTruthy()
+  })
+
+  it('shows budget alerts after stopping a task with a project that is near budget', async () => {
+    const runningTask = {
+      id: 'budg-stop',
+      description: 'Budget task',
+      startTime: new Date(Date.now() - 60000).toISOString(),
+      endTime: null,
+      projectIds: ['proj-1'],
+      tags: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    const stoppedTask = { ...runningTask, endTime: new Date().toISOString() }
+    const projectDetail = {
+      id: 'proj-1', name: 'BigProject', description: null, color: null, parentId: null,
+      ownerUsername: 'alice', createdAt: '2026-01-01T00:00:00Z', totalSeconds: 3500,
+      userBreakdown: [], budgetSeconds: 3600, budgetPeriod: 'TOTAL',
+      usedSeconds: 3500, budgetPercent: 97,
+    }
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/current'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => runningTask })
+      if (url.includes('/stop') && opts?.method === 'POST')
+        return Promise.resolve({ ok: true, status: 200, json: async () => stoppedTask })
+      if (url.includes('/projects/proj-1'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => projectDetail })
+      if (url.includes('/projects'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => screen.getByTestId('stop-button'))
+    fireEvent.click(screen.getByTestId('stop-button'))
+
+    await waitFor(() => expect(screen.getByTestId('budget-alerts')).toBeTruthy())
+    expect(screen.getByTestId('budget-alert-warning')).toBeTruthy()
+  })
+
+  it('dismisses budget alert when dismiss button is clicked', async () => {
+    const runningTask = {
+      id: 'budg-dismiss',
+      description: 'Dismiss task',
+      startTime: new Date(Date.now() - 60000).toISOString(),
+      endTime: null,
+      projectIds: ['proj-2'],
+      tags: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    const stoppedTask = { ...runningTask, endTime: new Date().toISOString() }
+    const projectDetail = {
+      id: 'proj-2', name: 'DismissProj', description: null, color: null, parentId: null,
+      ownerUsername: 'alice', createdAt: '2026-01-01T00:00:00Z', totalSeconds: 3700,
+      userBreakdown: [], budgetSeconds: 3600, budgetPeriod: 'TOTAL',
+      usedSeconds: 3700, budgetPercent: 102,
+    }
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/current'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => runningTask })
+      if (url.includes('/stop') && opts?.method === 'POST')
+        return Promise.resolve({ ok: true, status: 200, json: async () => stoppedTask })
+      if (url.includes('/projects/proj-2'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => projectDetail })
+      if (url.includes('/projects'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <DashboardPage username="alice" onLogout={vi.fn()} timezone="UTC" />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => screen.getByTestId('stop-button'))
+    fireEvent.click(screen.getByTestId('stop-button'))
+
+    await waitFor(() => screen.getByTestId('budget-alerts'))
+    expect(screen.getByTestId('budget-alert-exceeded')).toBeTruthy()
+    fireEvent.click(screen.getByTestId('budget-alert-dismiss'))
+    await waitFor(() => expect(screen.queryByTestId('budget-alerts')).toBeNull())
+  })
 })
