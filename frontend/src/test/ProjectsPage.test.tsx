@@ -1061,4 +1061,121 @@ describe('ProjectsPage', () => {
     fireEvent.click(screen.getByTestId('remove-member-bob'))
     await waitFor(() => expect(removeSpy).toHaveBeenCalled())
   })
+
+  it('invite API error shows error message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members') && opts?.method === 'POST')
+        return Promise.resolve({ ok: false, status: 404, text: async () => 'User not found' })
+      if (url.includes('/members'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects/'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 0 }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('invite-form'))
+    fireEvent.change(screen.getByTestId('invite-username-input'), { target: { value: 'ghost' } })
+    fireEvent.submit(screen.getByTestId('invite-form'))
+    await waitFor(() => expect(screen.getByTestId('invite-error')).toBeTruthy())
+  })
+
+  it('create form shows error when hours filled but period not selected', async () => {
+    mockFetch([])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('new-project-button'))
+    fireEvent.click(screen.getByTestId('new-project-button'))
+    fireEvent.change(screen.getByTestId('create-name-input'), { target: { value: 'New' } })
+    fireEvent.change(screen.getByTestId('create-budget-hours-input'), { target: { value: '10' } })
+    // leave period unset — fire submit on the inner <form> element
+    const innerForm = screen.getByTestId('create-form').querySelector('form')!
+    fireEvent.submit(innerForm)
+    await waitFor(() => expect(screen.getByTestId('form-error')).toBeTruthy())
+    expect(screen.getByTestId('form-error').textContent).toContain('valid number of hours')
+  })
+
+  it('create form submits with budget hours and period', async () => {
+    const createSpy = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/tags')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects') && opts?.method === 'POST') {
+        createSpy(JSON.parse(opts.body as string))
+        return Promise.resolve({ ok: true, status: 201, json: async () => project })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('new-project-button'))
+    fireEvent.click(screen.getByTestId('new-project-button'))
+    fireEvent.change(screen.getByTestId('create-name-input'), { target: { value: 'Budget Project' } })
+    fireEvent.change(screen.getByTestId('create-budget-hours-input'), { target: { value: '8' } })
+    fireEvent.change(screen.getByTestId('create-budget-period-select'), { target: { value: 'WEEKLY' } })
+    const innerForm = screen.getByTestId('create-form').querySelector('form')!
+    fireEvent.submit(innerForm)
+    await waitFor(() => expect(createSpy).toHaveBeenCalled())
+    const body = createSpy.mock.calls[0][0]
+    expect(body.budgetSeconds).toBe(28800)
+    expect(body.budgetPeriod).toBe('WEEKLY')
+  })
+
+  it('edit form budget inputs update values and submit sends budget', async () => {
+    const updateSpy = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/tags')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (opts?.method === 'PUT' && url.includes('/projects/')) {
+        updateSpy(JSON.parse(opts.body as string))
+        return Promise.resolve({ ok: true, status: 200, json: async () => project })
+      }
+      if (url.includes('/projects/')) return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 0 }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('edit-button'))
+    fireEvent.click(screen.getByTestId('edit-button'))
+    await waitFor(() => screen.getByTestId('edit-budget-hours-input'))
+    fireEvent.change(screen.getByTestId('edit-budget-hours-input'), { target: { value: '5' } })
+    fireEvent.change(screen.getByTestId('edit-budget-period-select'), { target: { value: 'MONTHLY' } })
+    const innerForm = screen.getByTestId('edit-form').querySelector('form')!
+    fireEvent.submit(innerForm)
+    await waitFor(() => expect(updateSpy).toHaveBeenCalled())
+    const body = updateSpy.mock.calls[0][0]
+    expect(body.budgetSeconds).toBe(18000)
+    expect(body.budgetPeriod).toBe('MONTHLY')
+  })
+
+  it('edit form shows error when hours filled but period not selected', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/tags')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects/')) return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...project, totalSeconds: 0 }) })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('edit-button'))
+    fireEvent.click(screen.getByTestId('edit-button'))
+    await waitFor(() => screen.getByTestId('edit-budget-hours-input'))
+    fireEvent.change(screen.getByTestId('edit-budget-hours-input'), { target: { value: '5' } })
+    // leave period unset — fire submit on the inner <form> element
+    const innerForm = screen.getByTestId('edit-form').querySelector('form')!
+    fireEvent.submit(innerForm)
+    await waitFor(() => expect(screen.getByTestId('edit-form-error')).toBeTruthy())
+    expect(screen.getByTestId('edit-form-error').textContent).toContain('valid number of hours')
+  })
 })
