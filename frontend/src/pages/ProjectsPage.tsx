@@ -41,7 +41,14 @@ function formatDuration(secs: number): string {
   return `${m}m`
 }
 
+function formatCost(amount: number): string {
+  return `€${amount.toFixed(2)}`
+}
 
+function taskCost(task: TaskResponse, hourlyRate: number | null | undefined): number | null {
+  if (hourlyRate == null) return null
+  return (durationSeconds(task) / 3600) * hourlyRate
+}
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) return <span className="text-gray-300 ml-1">↕</span>
@@ -64,11 +71,13 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
   const [newParentId, setNewParentId] = useState<string | null>(null)
   const [newBudgetHours, setNewBudgetHours] = useState('')
   const [newBudgetPeriod, setNewBudgetPeriod] = useState('')
+  const [newHourlyRate, setNewHourlyRate] = useState('')
   const [editingProject, setEditingProject] = useState<ProjectResponse | null>(null)
   const [editName, setEditName] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [editBudgetHours, setEditBudgetHours] = useState('')
   const [editBudgetPeriod, setEditBudgetPeriod] = useState<string>('')
+  const [editHourlyRate, setEditHourlyRate] = useState('')
   const [showBudgetEdit, setShowBudgetEdit] = useState(false)
   const [budgetError, setBudgetError] = useState<string | null>(null)
   const [dateFrom, setDateFrom] = useState('')
@@ -136,19 +145,33 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
       setNewParentId(null)
       setNewBudgetHours('')
       setNewBudgetPeriod('')
+      setNewHourlyRate('')
       setFormError(null)
     },
     onError: (err: Error) => setFormError(projectErrorMessage(err)),
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, name, budgetSeconds, budgetPeriod }: { id: string; name: string; budgetSeconds?: number | null; budgetPeriod?: string | null }) =>
+    mutationFn: ({
+      id,
+      name,
+      budgetSeconds,
+      budgetPeriod,
+      hourlyRate,
+    }: {
+      id: string
+      name: string
+      budgetSeconds?: number | null
+      budgetPeriod?: string | null
+      hourlyRate?: number | null
+    }) =>
       updateProject(id, {
         name,
         description: editingProject?.description,
         color: editingProject?.color,
         budgetSeconds: budgetSeconds !== undefined ? budgetSeconds : editingProject?.budgetSeconds,
         budgetPeriod: budgetPeriod !== undefined ? budgetPeriod : editingProject?.budgetPeriod,
+        hourlyRate: hourlyRate !== undefined ? hourlyRate : editingProject?.hourlyRate,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
@@ -217,11 +240,17 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
       setFormError('Enter a valid number of hours and select a period.')
       return
     }
+    const rate = parseFloat(newHourlyRate)
+    if (newHourlyRate !== '' && (isNaN(rate) || rate <= 0)) {
+      setFormError('Enter a valid hourly rate greater than 0.')
+      return
+    }
     createMutation.mutate({
       name: newName.trim(),
       parentId: newParentId,
       budgetSeconds: hasBudget ? Math.round(hours * 3600) : null,
       budgetPeriod: hasBudget ? newBudgetPeriod : null,
+      hourlyRate: newHourlyRate !== '' ? rate : null,
     })
   }
 
@@ -234,11 +263,17 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
       setFormError('Enter a valid number of hours and select a period.')
       return
     }
+    const rate = parseFloat(editHourlyRate)
+    if (editHourlyRate !== '' && (isNaN(rate) || rate <= 0)) {
+      setFormError('Enter a valid hourly rate greater than 0.')
+      return
+    }
     updateMutation.mutate({
       id: editingProject.id,
       name: editName.trim(),
       budgetSeconds: hasBudget ? Math.round(hours * 3600) : null,
       budgetPeriod: hasBudget ? editBudgetPeriod : null,
+      hourlyRate: editHourlyRate !== '' ? rate : null,
     })
   }
 
@@ -247,6 +282,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
     setEditName(project.name)
     setEditBudgetHours(project.budgetSeconds ? (project.budgetSeconds / 3600).toFixed(1) : '')
     setEditBudgetPeriod(project.budgetPeriod ?? '')
+    setEditHourlyRate(project.hourlyRate != null ? String(project.hourlyRate) : '')
     setFormError(null)
   }
 
@@ -305,6 +341,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
   const selectedProject = projects.find((p) => p.id === selectedProjectId) ?? null
   const displayProject = selectedProject
   const isOwner = displayProject?.ownerUsername === username
+  const showCostColumn = selectedDetail?.effectiveHourlyRate != null
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -419,6 +456,19 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                     </select>
                   </div>
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Hourly rate (optional, €/h)</label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.5"
+                    placeholder="e.g. 45.00"
+                    value={newHourlyRate}
+                    onChange={(e) => setNewHourlyRate(e.target.value)}
+                    className="w-24 border rounded px-2 py-1.5 text-sm"
+                    data-testid="create-hourly-rate-input"
+                  />
+                </div>
                 {formError && (
                   <p className="text-red-600 text-sm" data-testid="form-error">
                     {formError}
@@ -439,6 +489,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                       setShowCreateForm(false)
                       setNewBudgetHours('')
                       setNewBudgetPeriod('')
+                      setNewHourlyRate('')
                       setFormError(null)
                     }}
                     className="px-4 py-2 rounded text-sm border"
@@ -490,6 +541,19 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                       <option value="MONTHLY">Monthly</option>
                     </select>
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Hourly rate (optional, €/h)</label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.5"
+                    placeholder="e.g. 45.00"
+                    value={editHourlyRate}
+                    onChange={(e) => setEditHourlyRate(e.target.value)}
+                    className="w-24 border rounded px-2 py-1.5 text-sm"
+                    data-testid="edit-hourly-rate-input"
+                  />
                 </div>
                 {formError && <p className="text-red-600 text-sm" data-testid="edit-form-error">{formError}</p>}
                 <div className="flex gap-2">
@@ -580,6 +644,15 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                   <span className="font-semibold text-blue-700">
                     {formatDuration(selectedDetail?.totalSeconds ?? 0)}
                   </span>
+                  {selectedDetail?.effectiveHourlyRate != null && (
+                    <span data-testid="project-total-cost" className="ml-3 text-gray-700">
+                      Total cost:{' '}
+                      <span className="font-semibold text-green-700">
+                        {formatCost(selectedDetail.totalCost ?? 0)}
+                      </span>
+                      <span className="text-xs text-gray-400"> ({formatCost(selectedDetail.effectiveHourlyRate)}/h)</span>
+                    </span>
+                  )}
                 </div>
 
                 {/* Budget progress */}
@@ -913,7 +986,9 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                 ) : (
                   <>
                     {/* Table header */}
-                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-2 bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    <div
+                      className={`grid ${showCostColumn ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto]'} gap-x-4 px-4 py-2 bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wide`}
+                    >
                       <button
                         className="text-left flex items-center"
                         onClick={() => handleSort('description')}
@@ -946,6 +1021,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                         Duration
                         <SortIcon active={sortKey === 'duration'} dir={sortDir} />
                       </button>
+                      {showCostColumn && <span className="text-right">Cost</span>}
                     </div>
 
                     {/* Rows */}
@@ -954,7 +1030,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                         <li
                           key={task.id}
                           data-testid={`proj-task-${task.id}`}
-                          className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-3 border-b last:border-0 text-sm items-center"
+                          className={`grid ${showCostColumn ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto]'} gap-x-4 px-4 py-3 border-b last:border-0 text-sm items-center`}
                         >
                           <span className="truncate">
                             {task.description || '(no description)'}
@@ -987,6 +1063,14 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                           <span className="text-gray-700 font-medium text-right whitespace-nowrap">
                             {formatDuration(durationSeconds(task))}
                           </span>
+                          {showCostColumn && (
+                            <span
+                              className="text-green-700 font-medium text-right whitespace-nowrap"
+                              data-testid={`proj-task-cost-${task.id}`}
+                            >
+                              {formatCost(taskCost(task, selectedDetail?.effectiveHourlyRate) ?? 0)}
+                            </span>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -997,6 +1081,16 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                       <span className="font-semibold">
                         {formatDuration(sortedTasks.reduce((s, t) => s + durationSeconds(t), 0))}
                       </span>
+                      {showCostColumn && (
+                        <span data-testid="proj-total-cost-row" className="ml-3">
+                          Cost:{' '}
+                          <span className="font-semibold text-green-700">
+                            {formatCost(
+                              sortedTasks.reduce((s, t) => s + (taskCost(t, selectedDetail?.effectiveHourlyRate) ?? 0), 0),
+                            )}
+                          </span>
+                        </span>
+                      )}
                     </div>
                   </>
                 )}
