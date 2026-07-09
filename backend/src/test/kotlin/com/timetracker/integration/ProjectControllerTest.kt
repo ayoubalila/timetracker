@@ -1450,4 +1450,216 @@ class ProjectControllerTest {
                 jsonPath("$.budgetPercent") { value(37.5) }
             }
     }
+
+    // ── M9C: billable rates ────────────────────────────────────────────────────
+
+    private fun createProjectWithRate(
+        token: String,
+        name: String,
+        hourlyRate: String,
+        parentId: UUID? = null,
+    ): UUID {
+        val result =
+            mockMvc
+                .post("/api/projects") {
+                    header("Authorization", "Bearer $token")
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        objectMapper.writeValueAsString(
+                            CreateProjectRequest(name = name, parentId = parentId, hourlyRate = java.math.BigDecimal(hourlyRate)),
+                        )
+                }.andExpect { status { isCreated() } }
+                .andReturn()
+        return UUID.fromString(objectMapper.readTree(result.response.contentAsString)["id"].asText())
+    }
+
+    @Test
+    fun `POST projects with hourlyRate - 201 returns rate and effective rate`() {
+        val token = registerAndGetToken()
+        mockMvc
+            .post("/api/projects") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        CreateProjectRequest(name = "Client A", hourlyRate = java.math.BigDecimal("45.00")),
+                    )
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.hourlyRate") { value(45.00) }
+                jsonPath("$.effectiveHourlyRate") { value(45.00) }
+                // no time tracked yet on a freshly created project, so cost is 0
+                jsonPath("$.totalCost") { value(0.00) }
+            }
+    }
+
+    @Test
+    fun `POST projects - 400 when hourlyRate is zero`() {
+        val token = registerAndGetToken()
+        mockMvc
+            .post("/api/projects") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(mapOf("name" to "Work", "hourlyRate" to 0))
+            }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `POST projects - 400 when hourlyRate is negative`() {
+        val token = registerAndGetToken()
+        mockMvc
+            .post("/api/projects") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(mapOf("name" to "Work", "hourlyRate" to -10))
+            }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `PUT projects - updates hourlyRate`() {
+        val token = registerAndGetToken()
+        val id = createProject(token, "Work")
+        mockMvc
+            .put("/api/projects/$id") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    objectMapper.writeValueAsString(
+                        UpdateProjectRequest(name = "Work", hourlyRate = java.math.BigDecimal("30.00")),
+                    )
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.hourlyRate") { value(30.00) }
+                jsonPath("$.effectiveHourlyRate") { value(30.00) }
+            }
+    }
+
+    @Test
+    fun `PUT projects - clears hourlyRate when null`() {
+        val token = registerAndGetToken()
+        val id = createProjectWithRate(token, "Work", "30.00")
+        mockMvc
+            .put("/api/projects/$id") {
+                header("Authorization", "Bearer $token")
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(UpdateProjectRequest(name = "Work", hourlyRate = null))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.hourlyRate") { doesNotExist() }
+                jsonPath("$.effectiveHourlyRate") { doesNotExist() }
+            }
+    }
+
+    @Test
+    fun `GET projects id - effectiveHourlyRate inherited from parent`() {
+        val token = registerAndGetToken()
+        val parentId = createProjectWithRate(token, "Parent", "50.00")
+        val childId = createProject(token, "Child", parentId)
+        mockMvc
+            .get("/api/projects/$childId") { header("Authorization", "Bearer $token") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.hourlyRate") { doesNotExist() }
+                jsonPath("$.effectiveHourlyRate") { value(50.00) }
+            }
+    }
+
+    @Test
+    fun `GET projects id - own hourlyRate overrides inherited parent rate`() {
+        val token = registerAndGetToken()
+        val parentId = createProjectWithRate(token, "Parent", "50.00")
+        val childId = createProjectWithRate(token, "Child", "80.00", parentId)
+        mockMvc
+            .get("/api/projects/$childId") { header("Authorization", "Bearer $token") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.hourlyRate") { value(80.00) }
+                jsonPath("$.effectiveHourlyRate") { value(80.00) }
+            }
+    }
+
+    @Test
+    fun `GET projects id - effectiveHourlyRate null when no rate anywhere`() {
+        val token = registerAndGetToken()
+        val id = createProject(token, "Work")
+        mockMvc
+            .get("/api/projects/$id") { header("Authorization", "Bearer $token") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.effectiveHourlyRate") { doesNotExist() }
+                jsonPath("$.totalCost") { doesNotExist() }
+            }
+    }
+
+    @Test
+    fun `GET projects id - totalCost computed from tracked time and effective rate`() {
+        val token = registerAndGetToken()
+        val id = createProjectWithRate(token, "Work", "20.00")
+        val now = Instant.now()
+        createTask(token, now.minusSeconds(3600), now, listOf(id))
+
+        mockMvc
+            .get("/api/projects/$id") { header("Authorization", "Bearer $token") }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.totalSeconds") { value(3600) }
+                jsonPath("$.totalCost") { value(20.00) }
+            }
+    }
+
+    @Test
+    fun `GET export - hourly_rate and cost columns populated`() {
+        val token = registerAndGetToken()
+        val id = createProjectWithRate(token, "Client A", "40.00")
+        val now = Instant.now()
+        createTask(token, now.minusSeconds(3600), now, listOf(id))
+
+        val result =
+            mockMvc
+                .get("/api/projects/$id/export") { header("Authorization", "Bearer $token") }
+                .andExpect { status { isOk() } }
+                .andReturn()
+
+        val csv = result.response.contentAsString
+        assert(csv.startsWith("username,project_path,description,start_time,end_time,duration_seconds,tags,hourly_rate,cost"))
+        val dataLine = csv.lines().drop(1).first { it.isNotBlank() }
+        assert(dataLine.endsWith("40.00,40.00")) { "expected trailing hourly_rate,cost columns, was: $dataLine" }
+    }
+
+    @Test
+    fun `GET export - hourly_rate and cost blank when no effective rate`() {
+        val token = registerAndGetToken()
+        val id = createProject(token, "Client B")
+        val now = Instant.now()
+        createTask(token, now.minusSeconds(1800), now, listOf(id))
+
+        val result =
+            mockMvc
+                .get("/api/projects/$id/export") { header("Authorization", "Bearer $token") }
+                .andExpect { status { isOk() } }
+                .andReturn()
+
+        val csv = result.response.contentAsString
+        val dataLine = csv.lines().drop(1).first { it.isNotBlank() }
+        assert(dataLine.endsWith(",,")) { "expected blank hourly_rate,cost columns, was: $dataLine" }
+    }
+
+    @Test
+    fun `GET export - subproject rate override used for its own tasks`() {
+        val token = registerAndGetToken()
+        val parentId = createProjectWithRate(token, "Parent", "50.00")
+        val childId = createProjectWithRate(token, "Child", "80.00", parentId)
+        val now = Instant.now()
+        createTask(token, now.minusSeconds(3600), now, listOf(childId))
+
+        val result =
+            mockMvc
+                .get("/api/projects/$parentId/export") { header("Authorization", "Bearer $token") }
+                .andExpect { status { isOk() } }
+                .andReturn()
+
+        val csv = result.response.contentAsString
+        val dataLine = csv.lines().drop(1).first { it.isNotBlank() }
+        assert(dataLine.endsWith("80.00,80.00")) { "expected child's own rate to override parent's, was: $dataLine" }
+    }
 }

@@ -1,9 +1,12 @@
 package com.timetracker.dto
 
+import jakarta.validation.constraints.DecimalMin
+import jakarta.validation.constraints.Digits
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
+import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
@@ -20,6 +23,9 @@ data class CreateProjectRequest(
     val budgetSeconds: Long? = null,
     @field:Pattern(regexp = "^(TOTAL|WEEKLY|MONTHLY)$", message = "must be TOTAL, WEEKLY, or MONTHLY")
     val budgetPeriod: String? = null,
+    @field:DecimalMin(value = "0.0", inclusive = false, message = "must be greater than 0")
+    @field:Digits(integer = 8, fraction = 2)
+    val hourlyRate: BigDecimal? = null,
 )
 
 data class UpdateProjectRequest(
@@ -34,6 +40,9 @@ data class UpdateProjectRequest(
     val budgetSeconds: Long? = null,
     @field:Pattern(regexp = "^(TOTAL|WEEKLY|MONTHLY)$", message = "must be TOTAL, WEEKLY, or MONTHLY")
     val budgetPeriod: String? = null,
+    @field:DecimalMin(value = "0.0", inclusive = false, message = "must be greater than 0")
+    @field:Digits(integer = 8, fraction = 2)
+    val hourlyRate: BigDecimal? = null,
 )
 
 data class InviteMemberRequest(
@@ -62,6 +71,9 @@ data class ProjectResponse(
     val budgetPeriod: String? = null,
     val usedSeconds: Long = 0,
     val budgetPercent: Double? = null,
+    val hourlyRate: BigDecimal? = null,
+    val effectiveHourlyRate: BigDecimal? = null,
+    val totalCost: BigDecimal? = null,
 )
 
 data class MemberResponse(
