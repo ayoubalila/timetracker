@@ -19,6 +19,9 @@ export interface ProjectResponse {
   budgetPeriod?: string | null
   usedSeconds?: number
   budgetPercent?: number | null
+  hourlyRate?: number | null
+  effectiveHourlyRate?: number | null
+  totalCost?: number | null
 }
 
 export interface MemberResponse {
@@ -35,6 +38,7 @@ export interface CreateProjectRequest {
   parentId?: string | null
   budgetSeconds?: number | null
   budgetPeriod?: string | null
+  hourlyRate?: number | null
 }
 
 export interface UpdateProjectRequest {
@@ -43,4 +47,5 @@ export interface UpdateProjectRequest {
   color?: string | null
   budgetSeconds?: number | null
   budgetPeriod?: string | null
+  hourlyRate?: number | null
 }

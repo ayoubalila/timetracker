@@ -18,6 +18,8 @@ import com.timetracker.repository.UserRepository
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.YearMonth
@@ -65,6 +67,7 @@ class ProjectService(
                 owner = owner,
                 budgetSeconds = request.budgetSeconds,
                 budgetPeriod = request.budgetPeriod,
+                hourlyRate = request.hourlyRate,
             )
         return projectRepository.save(project).toResponse()
     }
@@ -98,6 +101,7 @@ class ProjectService(
         project.color = request.color
         project.budgetSeconds = request.budgetSeconds
         project.budgetPeriod = request.budgetPeriod
+        project.hourlyRate = request.hourlyRate
         return projectRepository.save(project).toResponse()
     }
 
@@ -226,13 +230,16 @@ class ProjectService(
             }
 
         val sb = StringBuilder()
-        sb.append("username,project_path,description,start_time,end_time,duration_seconds,tags\n")
+        sb.append("username,project_path,description,start_time,end_time,duration_seconds,tags,hourly_rate,cost\n")
         val now = Instant.now()
         for (task in tasks) {
-            val projPath = task.projects.firstOrNull { it in subtree }?.let { buildProjectPath(it) } ?: ""
+            val exportProject = task.projects.firstOrNull { it in subtree }
+            val projPath = exportProject?.let { buildProjectPath(it) } ?: ""
             val endTime = task.endTime
             val durationSeconds = ((endTime ?: now).epochSecond - task.startTime.epochSecond).coerceAtLeast(0)
             val tagsValue = task.tags.sortedBy { it.name }.joinToString(";") { it.name }
+            val effectiveRate = exportProject?.resolveEffectiveHourlyRate()
+            val cost = computeCost(durationSeconds, effectiveRate)
             sb.append(
                 listOf(
                     csvEscape(task.owner.username),
@@ -242,6 +249,8 @@ class ProjectService(
                     endTime?.toString() ?: "",
                     durationSeconds.toString(),
                     csvEscape(tagsValue),
+                    effectiveRate?.toPlainString() ?: "",
+                    cost?.toPlainString() ?: "",
                 ).joinToString(","),
             )
             sb.append("\n")
@@ -439,6 +448,26 @@ class ProjectService(
     }
 }
 
+fun Project.resolveEffectiveHourlyRate(): BigDecimal? {
+    var current: Project? = this
+    while (current != null) {
+        if (current.hourlyRate != null) return current.hourlyRate
+        current = current.parent
+    }
+    return null
+}
+
+private fun computeCost(
+    durationSeconds: Long,
+    hourlyRate: BigDecimal?,
+): BigDecimal? {
+    if (hourlyRate == null) return null
+    return BigDecimal(durationSeconds)
+        .divide(BigDecimal(3600), 10, RoundingMode.HALF_UP)
+        .multiply(hourlyRate)
+        .setScale(2, RoundingMode.HALF_UP)
+}
+
 fun Project.toResponse(
     totalSeconds: Long = 0,
     userBreakdown: List<UserTimeBreakdown> = emptyList(),
@@ -450,6 +479,8 @@ fun Project.toResponse(
         } else {
             null
         }
+    val effectiveHourlyRate = resolveEffectiveHourlyRate()
+    val totalCost = computeCost(totalSeconds, effectiveHourlyRate)
     return ProjectResponse(
         id = id,
         name = name,
@@ -465,6 +496,9 @@ fun Project.toResponse(
         budgetPeriod = budgetPeriod,
         usedSeconds = usedSeconds,
         budgetPercent = budgetPercent,
+        hourlyRate = hourlyRate,
+        effectiveHourlyRate = effectiveHourlyRate,
+        totalCost = totalCost,
     )
 }
 

@@ -1178,4 +1178,149 @@ describe('ProjectsPage', () => {
     await waitFor(() => expect(screen.getByTestId('edit-form-error')).toBeTruthy())
     expect(screen.getByTestId('edit-form-error').textContent).toContain('valid number of hours')
   })
+
+  // ── M9C: billable rates ──────────────────────────────────────────────────
+
+  const rateProject: ProjectResponse = {
+    ...project,
+    hourlyRate: 45,
+    effectiveHourlyRate: 45,
+    totalSeconds: 3600,
+    totalCost: 20,
+  }
+
+  function stubWithRate(detail: ProjectResponse, tasks: TaskResponse[] = []) {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/tags')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks')) return Promise.resolve({ ok: true, status: 200, json: async () => tasks })
+      if (url.includes('/projects/')) return Promise.resolve({ ok: true, status: 200, json: async () => detail })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [project] })
+    }))
+  }
+
+  it('shows total cost next to total time when project has an effective hourly rate', async () => {
+    stubWithRate(rateProject)
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByTestId('project-total-cost')).toBeTruthy())
+    expect(screen.getByTestId('project-total-cost').textContent).toContain('€20.00')
+  })
+
+  it('does not show total cost when no effective hourly rate', async () => {
+    mockFetch([project])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('project-detail'))
+    expect(screen.queryByTestId('project-total-cost')).toBeNull()
+  })
+
+  it('shows per-task cost column when project has an effective hourly rate', async () => {
+    stubWithRate(rateProject, [projTask1])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => expect(screen.getByTestId(`proj-task-cost-${projTask1.id}`)).toBeTruthy())
+    // 1h task at 45/h = 45.00
+    expect(screen.getByTestId(`proj-task-cost-${projTask1.id}`).textContent).toContain('€45.00')
+    expect(screen.getByTestId('proj-total-cost-row')).toBeTruthy()
+  })
+
+  it('does not show per-task cost column when no effective hourly rate', async () => {
+    stubWithTasks([projTask1])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId(`proj-task-${projTask1.id}`))
+    expect(screen.queryByTestId(`proj-task-cost-${projTask1.id}`)).toBeNull()
+    expect(screen.queryByTestId('proj-total-cost-row')).toBeNull()
+  })
+
+  it('create form shows error for hourly rate of zero or below', async () => {
+    mockFetch([])
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('new-project-button'))
+    fireEvent.click(screen.getByTestId('new-project-button'))
+    fireEvent.change(screen.getByTestId('create-name-input'), { target: { value: 'New' } })
+    fireEvent.change(screen.getByTestId('create-hourly-rate-input'), { target: { value: '0' } })
+    const innerForm = screen.getByTestId('create-form').querySelector('form')!
+    fireEvent.submit(innerForm)
+    await waitFor(() => expect(screen.getByTestId('form-error')).toBeTruthy())
+    expect(screen.getByTestId('form-error').textContent).toContain('hourly rate')
+  })
+
+  it('create form submits with hourly rate', async () => {
+    const createSpy = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/tags')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/projects') && opts?.method === 'POST') {
+        createSpy(JSON.parse(opts.body as string))
+        return Promise.resolve({ ok: true, status: 201, json: async () => project })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('new-project-button'))
+    fireEvent.click(screen.getByTestId('new-project-button'))
+    fireEvent.change(screen.getByTestId('create-name-input'), { target: { value: 'Client A' } })
+    fireEvent.change(screen.getByTestId('create-hourly-rate-input'), { target: { value: '45' } })
+    const innerForm = screen.getByTestId('create-form').querySelector('form')!
+    fireEvent.submit(innerForm)
+    await waitFor(() => expect(createSpy).toHaveBeenCalled())
+    const body = createSpy.mock.calls[0][0]
+    expect(body.hourlyRate).toBe(45)
+  })
+
+  it('edit form shows error for hourly rate of zero or below', async () => {
+    stubWithRate(rateProject)
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('edit-button'))
+    fireEvent.click(screen.getByTestId('edit-button'))
+    await waitFor(() => screen.getByTestId('edit-hourly-rate-input'))
+    fireEvent.change(screen.getByTestId('edit-hourly-rate-input'), { target: { value: '-5' } })
+    const innerForm = screen.getByTestId('edit-form').querySelector('form')!
+    fireEvent.submit(innerForm)
+    await waitFor(() => expect(screen.getByTestId('edit-form-error')).toBeTruthy())
+    expect(screen.getByTestId('edit-form-error').textContent).toContain('hourly rate')
+  })
+
+  it('edit form prefills and submits hourly rate', async () => {
+    const updateSpy = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/tags')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/members')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (url.includes('/tasks')) return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      if (opts?.method === 'PUT' && url.includes('/projects/')) {
+        updateSpy(JSON.parse(opts.body as string))
+        return Promise.resolve({ ok: true, status: 200, json: async () => rateProject })
+      }
+      if (url.includes('/projects/')) return Promise.resolve({ ok: true, status: 200, json: async () => rateProject })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [rateProject] })
+    }))
+    const { renderPage } = setup()
+    renderPage()
+    await waitFor(() => screen.getByTestId('project-node-1'))
+    fireEvent.click(screen.getByTestId('project-node-1'))
+    await waitFor(() => screen.getByTestId('edit-button'))
+    fireEvent.click(screen.getByTestId('edit-button'))
+    await waitFor(() => screen.getByTestId('edit-hourly-rate-input'))
+    expect((screen.getByTestId('edit-hourly-rate-input') as HTMLInputElement).value).toBe('45')
+    fireEvent.change(screen.getByTestId('edit-hourly-rate-input'), { target: { value: '60' } })
+    const innerForm = screen.getByTestId('edit-form').querySelector('form')!
+    fireEvent.submit(innerForm)
+    await waitFor(() => expect(updateSpy).toHaveBeenCalled())
+    const body = updateSpy.mock.calls[0][0]
+    expect(body.hourlyRate).toBe(60)
+  })
 })

@@ -21,6 +21,7 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.springframework.web.server.ResponseStatusException
+import java.math.BigDecimal
 import java.time.Instant
 import java.util.Optional
 import java.util.UUID
@@ -1089,5 +1090,190 @@ class ProjectServiceTest {
         assertTrue(result.usedSeconds >= 5399L)
         // budgetPercent should be > 100% for 7200s budget with > 5400s used
         assertTrue(result.budgetPercent != null && result.budgetPercent!! >= 74.0)
+    }
+
+    // ── M9C: billable rates ──────────────────────────────────────────────────
+
+    @Test
+    fun `create stores hourly rate`() {
+        stubAlice()
+        whenever(projectRepository.save(any<Project>())).thenAnswer { it.arguments[0] as Project }
+
+        val result = service.create("alice", CreateProjectRequest(name = "Client A", hourlyRate = BigDecimal("45.00")))
+
+        assertEquals(BigDecimal("45.00"), result.hourlyRate)
+        assertEquals(BigDecimal("45.00"), result.effectiveHourlyRate)
+    }
+
+    @Test
+    fun `update persists hourly rate`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice)
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.save(any<Project>())).thenAnswer { it.arguments[0] as Project }
+
+        val result = service.update("alice", p.id, UpdateProjectRequest(name = "Work", hourlyRate = BigDecimal("30.50")))
+
+        assertEquals(BigDecimal("30.50"), result.hourlyRate)
+    }
+
+    @Test
+    fun `update clears hourly rate when null`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice, hourlyRate = BigDecimal("30.00"))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.save(any<Project>())).thenAnswer { it.arguments[0] as Project }
+
+        val result = service.update("alice", p.id, UpdateProjectRequest(name = "Work", hourlyRate = null))
+
+        assertEquals(null, result.hourlyRate)
+        assertEquals(null, result.effectiveHourlyRate)
+    }
+
+    @Test
+    fun `effectiveHourlyRate is null when no rate anywhere in ancestor chain`() {
+        stubAlice()
+        val root = Project(name = "Root", owner = alice)
+        val child = Project(name = "Child", owner = alice, parent = root)
+        whenever(projectRepository.findByIdAndOwner(child.id, alice)).thenReturn(child)
+        whenever(projectRepository.findByParent(child)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(child))).thenReturn(emptyList())
+
+        val result = service.getById("alice", child.id)
+
+        assertEquals(null, result.effectiveHourlyRate)
+        assertEquals(null, result.totalCost)
+    }
+
+    @Test
+    fun `effectiveHourlyRate uses own rate over ancestor rate`() {
+        stubAlice()
+        val root = Project(name = "Root", owner = alice, hourlyRate = BigDecimal("10.00"))
+        val child = Project(name = "Child", owner = alice, parent = root, hourlyRate = BigDecimal("25.00"))
+        whenever(projectRepository.findByIdAndOwner(child.id, alice)).thenReturn(child)
+        whenever(projectRepository.findByParent(child)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(child))).thenReturn(emptyList())
+
+        val result = service.getById("alice", child.id)
+
+        assertEquals(BigDecimal("25.00"), result.effectiveHourlyRate)
+    }
+
+    @Test
+    fun `effectiveHourlyRate is inherited from parent when child has no rate`() {
+        stubAlice()
+        val root = Project(name = "Root", owner = alice, hourlyRate = BigDecimal("50.00"))
+        val child = Project(name = "Child", owner = alice, parent = root)
+        whenever(projectRepository.findByIdAndOwner(child.id, alice)).thenReturn(child)
+        whenever(projectRepository.findByParent(child)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(child))).thenReturn(emptyList())
+
+        val result = service.getById("alice", child.id)
+
+        assertEquals(BigDecimal("50.00"), result.effectiveHourlyRate)
+    }
+
+    @Test
+    fun `effectiveHourlyRate walks past an intermediate ancestor with no rate`() {
+        stubAlice()
+        val grandparent = Project(name = "Grandparent", owner = alice, hourlyRate = BigDecimal("60.00"))
+        val parent = Project(name = "Parent", owner = alice, parent = grandparent)
+        val child = Project(name = "Child", owner = alice, parent = parent)
+        whenever(projectRepository.findByIdAndOwner(child.id, alice)).thenReturn(child)
+        whenever(projectRepository.findByParent(child)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(child))).thenReturn(emptyList())
+
+        val result = service.getById("alice", child.id)
+
+        assertEquals(BigDecimal("60.00"), result.effectiveHourlyRate)
+    }
+
+    @Test
+    fun `totalCost is computed from total tracked seconds and effective rate`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice, hourlyRate = BigDecimal("20.00"))
+        val now = Instant.now()
+        val task = Task(startTime = now.minusSeconds(3600), endTime = now, owner = alice, projects = mutableSetOf(p))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(task))
+
+        val result = service.getById("alice", p.id)
+
+        assertEquals(BigDecimal("20.00"), result.totalCost)
+    }
+
+    @Test
+    fun `totalCost accounts for running task duration up to now`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice, hourlyRate = BigDecimal("36.00"))
+        val startTime = Instant.now().minusSeconds(1800)
+        val runningTask = Task(startTime = startTime, endTime = null, owner = alice, projects = mutableSetOf(p))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(runningTask))
+
+        val result = service.getById("alice", p.id)
+
+        // 1800s * 36/hour = 18.00, allow small timing drift while the test runs
+        assertTrue(result.totalCost != null && result.totalCost!! >= BigDecimal("17.90"))
+    }
+
+    @Test
+    fun `totalCost is zero for zero-duration task`() {
+        stubAlice()
+        val p = Project(name = "Work", owner = alice, hourlyRate = BigDecimal("50.00"))
+        val now = Instant.now()
+        val task = Task(startTime = now, endTime = now, owner = alice, projects = mutableSetOf(p))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(task))
+
+        val result = service.getById("alice", p.id)
+
+        assertEquals(BigDecimal("0.00"), result.totalCost)
+    }
+
+    @Test
+    fun `exportTasks includes hourly_rate and cost columns`() {
+        stubAlice()
+        val p = Project(name = "Client A", owner = alice, hourlyRate = BigDecimal("40.00"))
+        val now = Instant.now()
+        val task =
+            Task(
+                description = "Billable work",
+                startTime = now.minusSeconds(3600),
+                endTime = now,
+                owner = alice,
+                projects = mutableSetOf(p),
+            )
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(task))
+
+        val csv = service.exportTasks("alice", p.id, null)
+
+        val lines = csv.trim().lines()
+        assertEquals(
+            "username,project_path,description,start_time,end_time,duration_seconds,tags,hourly_rate,cost",
+            lines[0],
+        )
+        assertTrue(lines[1].endsWith("40.00,40.00"))
+    }
+
+    @Test
+    fun `exportTasks leaves rate and cost blank when no effective rate`() {
+        stubAlice()
+        val p = Project(name = "Client B", owner = alice)
+        val now = Instant.now()
+        val task = Task(startTime = now.minusSeconds(1800), endTime = now, owner = alice, projects = mutableSetOf(p))
+        whenever(projectRepository.findByIdAndOwner(p.id, alice)).thenReturn(p)
+        whenever(projectRepository.findByParent(p)).thenReturn(emptyList())
+        whenever(taskRepository.findAllByProjectsIn(setOf(p))).thenReturn(listOf(task))
+
+        val csv = service.exportTasks("alice", p.id, null)
+
+        val lines = csv.trim().lines()
+        assertTrue(lines[1].endsWith(",,"))
     }
 }

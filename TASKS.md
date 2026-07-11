@@ -175,12 +175,12 @@ Custom features approved and detailed in **Milestone 9** below (issues 76–91).
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 76 | Flyway V7 — `tag` and `task_tag` tables | chore | `tag`(id UUID PK, name VARCHAR(50), color VARCHAR(7), owner_id FK → users); `task_tag`(tag_id FK, task_id FK, PK both) |
-| 77 | [US] Create and delete personal tags (name + color) | feat | `GET/POST/DELETE /api/tags`; tags are user-scoped (never shared across users) |
-| 78 | [US] Assign tags to a task via multi-select tag picker | feat | `tagIds: List<UUID>` in `CreateTaskRequest` + `UpdateTaskRequest`; `tags: List<TagResponse>` in `TaskResponse`; chips in TaskForm UI |
-| 79 | [US] Filter task list and overviews by tag | feat | `?tagId=UUID` on `GET /api/tasks`, `GET /api/overview/*`, `GET /api/projects/{id}/tasks`; tag-filter dropdown on dashboard |
-| 80 | Tags column in CSV export | feat | Comma-separated tag names as an extra column in `GET /api/projects/{id}/export` |
-| 81 | Unit + integration tests — tags | test | Cover tag CRUD, assignment, filter, export column |
+| 76 | ~~Flyway V7 — `tag` and `task_tag` tables~~ ✅ #58 | chore | `tag`(id UUID PK, name VARCHAR(50), color VARCHAR(7), owner_id FK → users); `task_tag`(tag_id FK, task_id FK, PK both) |
+| 77 | ~~[US] Create and delete personal tags (name + color)~~ ✅ #59 | feat | `GET/POST/DELETE /api/tags`; tags are user-scoped (never shared across users) |
+| 78 | ~~[US] Assign tags to a task via multi-select tag picker~~ ✅ #60 | feat | `tagIds: List<UUID>` in `CreateTaskRequest` + `UpdateTaskRequest`; `tags: List<TagResponse>` in `TaskResponse`; chips in TaskForm UI |
+| 79 | ~~[US] Filter task list and overviews by tag~~ ✅ #61 | feat | `?tagId=UUID` on `GET /api/tasks`, `GET /api/overview/*`, `GET /api/projects/{id}/tasks`; tag-filter dropdown on dashboard |
+| 80 | ~~Tags column in CSV export~~ ✅ #62 | feat | Comma-separated tag names as an extra column in `GET /api/projects/{id}/export` |
+| 81 | ~~Unit + integration tests — tags~~ ✅ #63 | test | Cover tag CRUD, assignment, filter, export column |
 
 ---
 
@@ -188,11 +188,11 @@ Custom features approved and detailed in **Milestone 9** below (issues 76–91).
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 82 | Flyway V8 — budget columns on `project` | chore | `budget_seconds BIGINT` (nullable), `budget_period VARCHAR(20)` (nullable; values: `TOTAL`, `WEEKLY`, `MONTHLY`) |
-| 83 | [US] Set a time budget on a project | feat | Budget fields in `CreateProjectRequest`/`UpdateProjectRequest`; `ProjectResponse` includes `budgetSeconds`, `budgetPeriod`, `usedSeconds`, `budgetPercent` |
-| 84 | [US] Progress bar and usage % on project detail and sidebar | feat | Bar turns yellow at ≥ 80%, red at ≥ 100%; shown next to total time |
-| 85 | [US] Inline warning when stopping a task crosses a budget threshold | feat | After `POST /api/tasks/{id}/stop`, frontend re-queries aggregated time and shows alert if threshold newly crossed |
-| 86 | Unit + integration tests — time budgets | test | Cover budget CRUD, aggregation comparison, shared-project combined total |
+| 82 | ~~Flyway V8 — budget columns on `project`~~ ✅ #65 | chore | `budget_seconds BIGINT` (nullable), `budget_period VARCHAR(20)` (nullable; values: `TOTAL`, `WEEKLY`, `MONTHLY`) |
+| 83 | ~~[US] Set a time budget on a project~~ ✅ #66 | feat | Budget fields in `CreateProjectRequest`/`UpdateProjectRequest`; `ProjectResponse` includes `budgetSeconds`, `budgetPeriod`, `usedSeconds`, `budgetPercent` |
+| 84 | ~~[US] Progress bar and usage % on project detail and sidebar~~ ✅ #67 | feat | Bar turns yellow at ≥ 80%, red at ≥ 100%; shown next to total time |
+| 85 | ~~[US] Inline warning when stopping a task crosses a budget threshold~~ ✅ #68 | feat | After `POST /api/tasks/{id}/stop`, frontend re-queries aggregated time and shows alert if threshold newly crossed |
+| 86 | ~~Unit + integration tests — time budgets~~ ✅ #69 | test | Cover budget CRUD, aggregation comparison, shared-project combined total |
 
 ---
 
@@ -200,11 +200,11 @@ Custom features approved and detailed in **Milestone 9** below (issues 76–91).
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 87 | Flyway V9 — `hourly_rate` column on `project` | chore | `DECIMAL(10,2)` nullable; null = inherit from nearest ancestor with a rate |
-| 88 | [US] Set an hourly rate on a project (subprojects inherit) | feat | Rate field in project create/edit form; `ProjectResponse` includes `effectiveHourlyRate` (walks parent chain; null if none found) |
-| 89 | [US] View cost per task and total cost on project detail | feat | Task rows show cost = duration × effective rate; project header shows total cost alongside total time |
-| 90 | Cost columns in CSV export | feat | Add `hourly_rate` and `cost` columns to export (blank if no effective rate) |
-| 91 | Unit + integration tests — billable rates | test | Cover rate inheritance chain walk, zero-duration edge case, null-rate export column |
+| 87 | Flyway V9 — `hourly_rate` column on `project` | chore #71 | `DECIMAL(10,2)` nullable; null = inherit from nearest ancestor with a rate |
+| 88 | [US] Set an hourly rate on a project (subprojects inherit) | feat #72 | Rate field in project create/edit form; `ProjectResponse` includes `effectiveHourlyRate` (walks parent chain; null if none found) |
+| 89 | [US] View cost per task and total cost on project detail | feat #73 | Task rows show cost = duration × effective rate; project header shows total cost alongside total time |
+| 90 | Cost columns in CSV export | feat #74 | Add `hourly_rate` and `cost` columns to export (blank if no effective rate) |
+| 91 | Unit + integration tests — billable rates | test #75 | Cover rate inheritance chain walk, zero-duration edge case, null-rate export column |
 
 ---
 

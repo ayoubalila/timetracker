@@ -7,6 +7,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
 
@@ -33,4 +34,6 @@ class Project(
     var budgetSeconds: Long? = null,
     @Column(name = "budget_period", length = 20)
     var budgetPeriod: String? = null,
+    @Column(name = "hourly_rate", precision = 10, scale = 2)
+    var hourlyRate: BigDecimal? = null,
 )
