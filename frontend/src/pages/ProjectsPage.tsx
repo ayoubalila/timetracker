@@ -436,7 +436,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                     <input
                       type="number"
                       min="0.1"
-                      step="0.5"
+                      step="0.1"
                       placeholder="Hours"
                       value={newBudgetHours}
                       onChange={(e) => setNewBudgetHours(e.target.value)}
@@ -461,7 +461,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                   <input
                     type="number"
                     min="0.01"
-                    step="0.5"
+                    step="0.01"
                     placeholder="e.g. 45.00"
                     value={newHourlyRate}
                     onChange={(e) => setNewHourlyRate(e.target.value)}
@@ -522,7 +522,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                     <input
                       type="number"
                       min="0.1"
-                      step="0.5"
+                      step="0.1"
                       placeholder="Hours"
                       value={editBudgetHours}
                       onChange={(e) => setEditBudgetHours(e.target.value)}
@@ -547,7 +547,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                   <input
                     type="number"
                     min="0.01"
-                    step="0.5"
+                    step="0.01"
                     placeholder="e.g. 45.00"
                     value={editHourlyRate}
                     onChange={(e) => setEditHourlyRate(e.target.value)}
@@ -723,7 +723,7 @@ export function ProjectsPage({ username, onLogout, timezone }: ProjectsPageProps
                           <input
                             type="number"
                             min="0.1"
-                            step="0.5"
+                            step="0.1"
                             value={editBudgetHours}
                             onChange={(e) => setEditBudgetHours(e.target.value)}
                             className="w-24 border rounded px-2 py-1 text-sm"
