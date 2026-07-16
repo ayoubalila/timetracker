@@ -37,7 +37,8 @@ cp .env.example .env
 docker compose up --build
 
 # 3. The application is now available at:
-#    http://localhost:8080
+#    http://localhost        (frontend — open this in your browser)
+#    http://localhost:8080   (backend API only, e.g. http://localhost:8080/api/auth/login)
 ```
 
 To stop:
