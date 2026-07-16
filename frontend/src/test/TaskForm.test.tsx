@@ -140,4 +140,22 @@ describe('TaskForm', () => {
     fireEvent.submit(screen.getByTestId('task-form'))
     expect(onSave.mock.calls[0][0].endTime).toBeUndefined()
   })
+
+  it('calls onCancel when Escape key is pressed', () => {
+    const onCancel = vi.fn()
+    render(
+      <TaskForm task={null} projects={[]} tags={[]} onSave={vi.fn()} onCancel={onCancel} error={null} isPending={false} />,
+    )
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onCancel).toHaveBeenCalledOnce()
+  })
+
+  it('does not call onCancel for a non-Escape key press', () => {
+    const onCancel = vi.fn()
+    render(
+      <TaskForm task={null} projects={[]} tags={[]} onSave={vi.fn()} onCancel={onCancel} error={null} isPending={false} />,
+    )
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onCancel).not.toHaveBeenCalled()
+  })
 })

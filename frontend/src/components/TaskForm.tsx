@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { TaskResponse } from '../types/task'
 import type { ProjectResponse } from '../types/project'
 import type { TagResponse } from '../types/tag'
 import { TagPicker } from './TagPicker'
+import { ProjectToggle } from './ProjectToggle'
+import { Alert } from './Alert'
+import { SpinnerIcon } from './icons'
 import { toDatetimeLocalInTz, fromDatetimeLocalInTz } from '../utils/timezone'
 
 interface TaskFormProps {
@@ -22,6 +25,9 @@ interface TaskFormProps {
   timezone?: string
 }
 
+const fieldClasses =
+  'mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent-soft'
+
 export function TaskForm({ task, projects, tags, onSave, onCancel, error, isPending, timezone }: TaskFormProps) {
   const tz = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -34,6 +40,14 @@ export function TaskForm({ task, projects, tags, onSave, onCancel, error, isPend
   const [endTime, setEndTime] = useState(task?.endTime ? toLocal(task.endTime) : '')
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(task?.projectIds ?? [])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(task?.tags?.map((t) => t.id) ?? [])
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onCancel])
 
   function toggleProject(id: string) {
     setSelectedProjectIds((prev) =>
@@ -55,88 +69,94 @@ export function TaskForm({ task, projects, tags, onSave, onCancel, error, isPend
   return (
     <div
       data-testid="task-form-overlay"
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
     >
       <form
         data-testid="task-form"
         onSubmit={handleSubmit}
-        className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="task-form-title"
+        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl"
       >
-        <h2 className="text-lg font-semibold mb-4">{task ? 'Edit Task' : 'Add Task'}</h2>
+        <h2 id="task-form-title" className="text-lg font-semibold tracking-tight text-slate-900">
+          {task ? 'Edit Task' : 'Add Task'}
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          {task ? 'Update the details of this time entry.' : 'Log a task with an exact start and end time.'}
+        </p>
 
-        {error && (
-          <p data-testid="form-error" className="text-red-600 text-sm mb-3">
-            {error}
-          </p>
-        )}
+        <div className="mt-5 space-y-4">
+          {error && <Alert variant="error" message={error} testId="form-error" />}
 
-        <label className="block mb-3">
-          <span className="text-sm font-medium text-gray-700">Description</span>
-          <input
-            data-testid="task-description"
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            maxLength={500}
-            className="mt-1 block w-full border rounded px-3 py-2 text-sm"
-            placeholder="What are you working on?"
-          />
-        </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Description</span>
+            <input
+              data-testid="task-description"
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={500}
+              className={fieldClasses}
+              placeholder="What are you working on?"
+            />
+          </label>
 
-        <label className="block mb-3">
-          <span className="text-sm font-medium text-gray-700">Start time</span>
-          <input
-            data-testid="task-start-time"
-            type="datetime-local"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            required
-            className="mt-1 block w-full border rounded px-3 py-2 text-sm"
-          />
-        </label>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Start time</span>
+              <input
+                data-testid="task-start-time"
+                type="datetime-local"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                required
+                className={fieldClasses}
+              />
+            </label>
 
-        <label className="block mb-3">
-          <span className="text-sm font-medium text-gray-700">
-            End time{task !== null ? ' (leave empty if still running)' : ''}
-          </span>
-          <input
-            data-testid="task-end-time"
-            type="datetime-local"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            required={task === null}
-            className="mt-1 block w-full border rounded px-3 py-2 text-sm"
-          />
-        </label>
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">
+                End time{task !== null ? ' (leave empty if still running)' : ''}
+              </span>
+              <input
+                data-testid="task-end-time"
+                type="datetime-local"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                required={task === null}
+                className={fieldClasses}
+              />
+            </label>
+          </div>
 
-        {projects.length > 0 && (
-          <fieldset className="mb-4">
-            <legend className="text-sm font-medium text-gray-700 mb-1">Projects</legend>
-            <div className="flex flex-wrap gap-2">
-              {projects.map((p) => (
-                <label key={p.id} className="flex items-center gap-1 text-sm cursor-pointer">
-                  <input
-                    data-testid={`project-checkbox-${p.id}`}
-                    type="checkbox"
+          {projects.length > 0 && (
+            <fieldset>
+              <legend className="mb-1.5 block text-sm font-medium text-slate-700">Projects</legend>
+              <div className="flex flex-wrap gap-2">
+                {projects.map((p) => (
+                  <ProjectToggle
+                    key={p.id}
+                    project={p}
                     checked={selectedProjectIds.includes(p.id)}
                     onChange={() => toggleProject(p.id)}
+                    testId={`project-checkbox-${p.id}`}
                   />
-                  {p.name}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        )}
+                ))}
+              </div>
+            </fieldset>
+          )}
 
-        <TagPicker tags={tags} selected={selectedTagIds} onChange={setSelectedTagIds} />
+          <TagPicker tags={tags} selected={selectedTagIds} onChange={setSelectedTagIds} />
+        </div>
 
-        <div className="flex justify-end gap-2">
+        <div className="mt-6 flex justify-end gap-2">
           <button
             type="button"
             data-testid="task-form-cancel"
             onClick={onCancel}
-            className="px-4 py-2 text-sm border rounded hover:bg-gray-50"
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
           >
             Cancel
           </button>
@@ -144,8 +164,9 @@ export function TaskForm({ task, projects, tags, onSave, onCancel, error, isPend
             type="submit"
             data-testid="task-form-save"
             disabled={isPending}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
           >
+            {isPending && <SpinnerIcon className="h-4 w-4" />}
             {isPending ? 'Saving…' : 'Save'}
           </button>
         </div>

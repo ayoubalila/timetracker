@@ -100,6 +100,29 @@ describe('LoginPage', () => {
     await waitFor(() => expect(screen.getByTestId('error-message').textContent).toBe('Connection refused'))
   })
 
+  it('shows error message on failed login with 403 status', async () => {
+    mockFetch('Forbidden', 403)
+    render(<LoginPage onLogin={vi.fn()} />)
+
+    fireEvent.change(screen.getByTestId('input-username'), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByTestId('input-password'), { target: { value: 'wrong' } })
+    fireEvent.click(screen.getByTestId('submit-button'))
+
+    await waitFor(() => expect(screen.getByTestId('error-message').textContent).toBe('Wrong username or password'))
+  })
+
+  it('toggles password visibility when the eye icon is clicked', () => {
+    render(<LoginPage onLogin={vi.fn()} />)
+    const passwordInput = screen.getByTestId('input-password') as HTMLInputElement
+    expect(passwordInput.type).toBe('password')
+
+    fireEvent.click(screen.getByLabelText('Show password'))
+    expect(passwordInput.type).toBe('text')
+
+    fireEvent.click(screen.getByLabelText('Hide password'))
+    expect(passwordInput.type).toBe('password')
+  })
+
   it('shows loading state while submitting', async () => {
     let resolve!: (v: unknown) => void
     const fetchPromise = new Promise((r) => { resolve = r })

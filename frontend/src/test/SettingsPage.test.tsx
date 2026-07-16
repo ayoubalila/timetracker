@@ -124,6 +124,53 @@ describe('SettingsPage', () => {
     expect(screen.getByTestId('settings-error').textContent).toContain('Current password is incorrect')
   })
 
+  it('shows error message when API call fails with 401', async () => {
+    mockFetch('Unauthorized', false, 401)
+
+    renderSettings()
+    fireEvent.change(screen.getByTestId('current-password-input'), { target: { value: 'wrongpass' } })
+    fireEvent.change(screen.getByTestId('new-password-input'), { target: { value: 'newpass1' } })
+    fireEvent.change(screen.getByTestId('confirm-password-input'), { target: { value: 'newpass1' } })
+    fireEvent.submit(screen.getByTestId('change-password-form'))
+
+    await waitFor(() => expect(screen.getByTestId('settings-error')).toBeTruthy())
+    expect(screen.getByTestId('settings-error').textContent).toContain('Current password is incorrect')
+  })
+
+  it('shows error message when API call fails with 403', async () => {
+    mockFetch('Forbidden', false, 403)
+
+    renderSettings()
+    fireEvent.change(screen.getByTestId('current-password-input'), { target: { value: 'wrongpass' } })
+    fireEvent.change(screen.getByTestId('new-password-input'), { target: { value: 'newpass1' } })
+    fireEvent.change(screen.getByTestId('confirm-password-input'), { target: { value: 'newpass1' } })
+    fireEvent.submit(screen.getByTestId('change-password-form'))
+
+    await waitFor(() => expect(screen.getByTestId('settings-error')).toBeTruthy())
+    expect(screen.getByTestId('settings-error').textContent).toContain('Current password is incorrect')
+  })
+
+  it('toggles visibility for current, new, and confirm password fields', () => {
+    mockFetch({})
+    renderSettings()
+
+    const current = screen.getByTestId('current-password-input') as HTMLInputElement
+    const newPw = screen.getByTestId('new-password-input') as HTMLInputElement
+    const confirm = screen.getByTestId('confirm-password-input') as HTMLInputElement
+
+    expect(current.type).toBe('password')
+    fireEvent.click(screen.getAllByLabelText('Show password')[0])
+    expect(current.type).toBe('text')
+
+    expect(newPw.type).toBe('password')
+    fireEvent.click(screen.getAllByLabelText('Show password')[0])
+    expect(newPw.type).toBe('text')
+
+    expect(confirm.type).toBe('password')
+    fireEvent.click(screen.getAllByLabelText('Show password')[0])
+    expect(confirm.type).toBe('text')
+  })
+
   it('calls logout handler when logout button clicked', () => {
     mockFetch({})
     const onLogout = vi.fn()
@@ -205,6 +252,34 @@ describe('SettingsPage', () => {
     expect(screen.getByTestId('timezone-error').textContent).toContain('Invalid timezone')
   })
 
+  it('shows the error message when timezone submit throws a plain Error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      return Promise.reject(new Error('Network down'))
+    }))
+    renderSettings()
+    fireEvent.change(screen.getByTestId('timezone-input'), { target: { value: 'Europe/Berlin' } })
+    fireEvent.submit(screen.getByTestId('timezone-form'))
+
+    await waitFor(() => expect(screen.getByTestId('timezone-error')).toBeTruthy())
+    expect(screen.getByTestId('timezone-error').textContent).toBe('Network down')
+  })
+
+  it('shows "An error occurred" when timezone submit throws a non-Error value', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes('/tags'))
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      return Promise.reject('not an error object')
+    }))
+    renderSettings()
+    fireEvent.change(screen.getByTestId('timezone-input'), { target: { value: 'Europe/Berlin' } })
+    fireEvent.submit(screen.getByTestId('timezone-form'))
+
+    await waitFor(() => expect(screen.getByTestId('timezone-error')).toBeTruthy())
+    expect(screen.getByTestId('timezone-error').textContent).toBe('An error occurred')
+  })
+
   // ── Tags section ──────────────────────────────────────────────────────────
 
   it('renders the tags section', () => {
@@ -280,6 +355,39 @@ describe('SettingsPage', () => {
     await waitFor(() => screen.getByTestId('delete-tag-t1'))
     fireEvent.click(screen.getByTestId('delete-tag-t1'))
     await waitFor(() => expect(deleteSpy).toHaveBeenCalled())
+  })
+
+  it('does not create a tag when name is blank', () => {
+    mockFetch({})
+    renderSettings()
+    fireEvent.submit(screen.getByTestId('tag-create-form'))
+    expect(screen.queryByTestId('tag-preview')).toBeNull()
+  })
+
+  it('selects a color swatch for the new tag', () => {
+    mockFetch({})
+    renderSettings()
+    fireEvent.change(screen.getByTestId('tag-name-input'), { target: { value: 'Focus' } })
+    const swatch = screen.getByLabelText('Select color #059669')
+    fireEvent.click(swatch)
+    expect(swatch.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('shows loading state while creating a tag', async () => {
+    let resolve!: (v: unknown) => void
+    const pending = new Promise((r) => { resolve = r })
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if ((url as string).includes('/tags') && opts?.method === 'POST') return pending
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+    }))
+
+    renderSettings()
+    fireEvent.change(screen.getByTestId('tag-name-input'), { target: { value: 'Focus' } })
+    fireEvent.submit(screen.getByTestId('tag-create-form'))
+
+    await waitFor(() => expect(screen.getByTestId('create-tag-submit').textContent).toBe('Adding…'))
+    resolve({ ok: true, status: 201, json: async () => ({ id: 'new', name: 'Focus', color: '#2563EB' }) })
+    await waitFor(() => expect(screen.getByTestId('create-tag-submit').textContent).toBe('+ Add tag'))
   })
 
   it('shows tag form error when creation fails', async () => {

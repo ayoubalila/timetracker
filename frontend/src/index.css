@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+@theme {
+  /* Auth / brand panel tokens — reused across login, register, and reset pages */
+  --color-ink: #0b1120;
+  --color-ink-soft: #182238;
+  --color-accent: #3654e0;
+  --color-accent-strong: #2a41b8;
+  --color-accent-soft: #eef1ff;
+}
+
 :root {
   font-family: system-ui, -apple-system, sans-serif;
   line-height: 1.5;

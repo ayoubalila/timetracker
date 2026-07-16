@@ -14,9 +14,9 @@ export function TagPicker({ tags, selected, onChange }: TagPickerProps) {
   }
 
   return (
-    <fieldset className="mb-3">
-      <legend className="text-sm font-medium text-gray-700 mb-1">Tags</legend>
-      <div className="flex flex-wrap gap-1">
+    <fieldset>
+      <legend className="mb-1.5 block text-sm font-medium text-slate-700">Tags</legend>
+      <div className="flex flex-wrap gap-1.5">
         {tags.map((tag) => {
           const active = selected.includes(tag.id)
           return (
@@ -25,7 +25,8 @@ export function TagPicker({ tags, selected, onChange }: TagPickerProps) {
               type="button"
               data-testid={`tag-chip-${tag.id}`}
               onClick={() => toggle(tag.id)}
-              className="px-2 py-0.5 rounded-full text-xs font-medium border transition-opacity"
+              aria-pressed={active}
+              className="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-soft"
               style={{
                 backgroundColor: active ? tag.color : 'transparent',
                 borderColor: tag.color,
