@@ -20,7 +20,12 @@ export function StatTile({ icon, label, value, active, onClick, testId }: StatTi
         </span>
         <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
-      <p className="mt-3 font-mono text-2xl font-semibold tabular-nums text-slate-900 sm:text-3xl">{value}</p>
+      <p
+        className="mt-3 font-mono text-2xl font-semibold tabular-nums text-slate-900 sm:text-3xl"
+        data-testid={testId ? `${testId}-value` : undefined}
+      >
+        {value}
+      </p>
     </>
   )
 

@@ -35,9 +35,12 @@ export function TaskForm({ task, projects, tags, onSave, onCancel, error, isPend
   const fromLocal = (value: string) => fromDatetimeLocalInTz(value, tz)
   const defaultStart = toDatetimeLocalInTz(new Date().toISOString(), tz)
 
+  const initialStartLocal = task ? toLocal(task.startTime) : defaultStart
+  const initialEndLocal = task?.endTime ? toLocal(task.endTime) : ''
+
   const [description, setDescription] = useState(task?.description ?? '')
-  const [startTime, setStartTime] = useState(task ? toLocal(task.startTime) : defaultStart)
-  const [endTime, setEndTime] = useState(task?.endTime ? toLocal(task.endTime) : '')
+  const [startTime, setStartTime] = useState(initialStartLocal)
+  const [endTime, setEndTime] = useState(initialEndLocal)
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(task?.projectIds ?? [])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(task?.tags?.map((t) => t.id) ?? [])
 
@@ -57,10 +60,20 @@ export function TaskForm({ task, projects, tags, onSave, onCancel, error, isPend
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    // Preserve the original, full-precision timestamp for any field the user didn't touch —
+    // the datetime-local input only has second-level resolution, so round-tripping an
+    // unedited value through it can collapse a short task's start/end onto the same second.
+    const finalStartTime = task && startTime === initialStartLocal ? task.startTime : fromLocal(startTime)
+    const finalEndTime = !endTime
+      ? undefined
+      : task?.endTime && endTime === initialEndLocal
+        ? task.endTime
+        : fromLocal(endTime)
+
     onSave({
       description,
-      startTime: fromLocal(startTime),
-      endTime: endTime ? fromLocal(endTime) : undefined,
+      startTime: finalStartTime,
+      endTime: finalEndTime,
       projectIds: selectedProjectIds,
       tagIds: selectedTagIds,
     })
@@ -109,6 +122,7 @@ export function TaskForm({ task, projects, tags, onSave, onCancel, error, isPend
               <input
                 data-testid="task-start-time"
                 type="datetime-local"
+                step="1"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
                 required
@@ -123,6 +137,7 @@ export function TaskForm({ task, projects, tags, onSave, onCancel, error, isPend
               <input
                 data-testid="task-end-time"
                 type="datetime-local"
+                step="1"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
                 required={task === null}

@@ -5,7 +5,9 @@ function getTzOffsetMs(tz: string, date: Date): number {
   return d1.getTime() - d2.getTime()
 }
 
-// Converts a UTC ISO string to "YYYY-MM-DDTHH:MM" as seen in `tz` (for datetime-local inputs).
+// Converts a UTC ISO string to "YYYY-MM-DDTHH:MM:SS" as seen in `tz` (for datetime-local inputs).
+// Seconds are preserved so that round-tripping a short task through the edit form doesn't
+// collapse a valid startTime/endTime pair onto the same instant (backend requires endTime > startTime).
 export function toDatetimeLocalInTz(iso: string, tz: string): string {
   const d = new Date(iso)
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -15,10 +17,11 @@ export function toDatetimeLocalInTz(iso: string, tz: string): string {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     hourCycle: 'h23',
   }).formatToParts(d)
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00'
-  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`
 }
 
 // Interprets a "YYYY-MM-DDTHH:MM" datetime-local value as being in `tz` and returns a UTC ISO string.

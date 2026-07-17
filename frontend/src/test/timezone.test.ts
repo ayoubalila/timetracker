@@ -19,6 +19,6 @@ describe('toDatetimeLocalInTz', () => {
     } as unknown as typeof Intl.DateTimeFormat)
 
     const result = toDatetimeLocalInTz('2026-07-01T10:30:00Z', 'UTC')
-    expect(result).toBe('2026-07-00T10:30')
+    expect(result).toBe('2026-07-00T10:30:00')
   })
 })
