@@ -91,17 +91,12 @@ jobs:
     name: System (Playwright)
     runs-on: self-hosted
     needs: [backend, frontend]
-    # Same container approach as the backend/frontend jobs above: this job previously ran
-    # directly on the runner host, which — unlike the containerized jobs above, which run
-    # as root — couldn't clean up root-owned files left in the shared workspace by them.
-    # Base on the backend job's JDK image (Ubuntu-based) and layer Node on top, since a JDK
-    # isn't available via the minimal Debian-slim Node image's default apt sources.
-    container:
-      image: eclipse-temurin:21-jdk-jammy
-    # A GitHub Actions service container (rather than `docker compose` run from inside the
-    # job) so it lands on the job container's own network and is reachable at localhost —
-    # containers started via the auto-mounted host Docker socket would be host-network
-    # siblings instead, invisible from inside this container's network namespace.
+    # Runs directly on the runner host (Java/Node/Docker are all assumed present per the
+    # course's grading-environment spec) rather than in a container: containers started
+    # from *inside* a containerized job (whether via `docker compose` through the mounted
+    # host socket, or a `services:` container) are not reachable at localhost from inside
+    # that job's own container network namespace. On a host-based job, by contrast, a
+    # `services:` container's published port is just an ordinary host port.
     services:
       db-test:
         image: postgres:16-alpine
@@ -118,15 +113,13 @@ jobs:
           --health-retries 10
 
     steps:
-      - uses: actions/checkout@v4
+      # backend/frontend run in containers as root; when this job reuses the same shared
+      # runner workspace, actions/checkout's cleanup step can't remove the root-owned files
+      # they left behind. Hand ownership back with a throwaway container first.
+      - name: Fix workspace ownership left by prior containerized jobs
+        run: docker run --rm -v "${{ github.workspace }}:/workspace" alpine chown -R $(id -u):$(id -g) /workspace
 
-      - name: Install Node.js
-        run: |
-          apt-get update -qq
-          apt-get install -y --no-install-recommends ca-certificates curl gnupg
-          curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-          apt-get install -y --no-install-recommends nodejs
-          rm -rf /var/lib/apt/lists/*
+      - uses: actions/checkout@v4
 
       - name: Cache Gradle wrapper and caches
         uses: actions/cache@v4
