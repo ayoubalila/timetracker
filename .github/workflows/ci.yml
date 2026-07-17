@@ -36,7 +36,7 @@ jobs:
 
       - name: Run tests + coverage
         working-directory: backend
-        run: ./gradlew test jacocoTestReport --no-daemon
+        run: ./gradlew test jacocoTestReport jacocoTestCoverageVerification --no-daemon
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
