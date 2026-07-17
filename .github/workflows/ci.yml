@@ -121,6 +121,22 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      # The bare runner host only has git + Docker; Java/Node live in the per-job container
+      # images used by the backend/frontend jobs above, not on the host itself — don't
+      # assume either is present here.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - run: java -version && node --version && npm --version
+
       - name: Cache Gradle wrapper and caches
         uses: actions/cache@v4
         with:
