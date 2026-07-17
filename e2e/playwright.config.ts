@@ -3,6 +3,12 @@ import { defineConfig, devices } from '@playwright/test'
 const BACKEND_PORT = 8080
 const FRONTEND_PORT = 5173
 
+// Locally, docker-compose.test.yml publishes db-test on localhost:5433. In CI the system
+// job runs in a container, where the db-test service is reachable by service name on its
+// internal port instead — see .github/workflows/ci.yml, which sets these two env vars.
+const DB_HOST = process.env.E2E_DB_HOST ?? 'localhost'
+const DB_PORT = process.env.E2E_DB_PORT ?? '5433'
+
 // System tests run against a real backend + frontend + dedicated Postgres test
 // database (docker-compose.test.yml), never against production data — see
 // CLAUDE.md testing rules. Start the test database before running these tests:
@@ -33,7 +39,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        './gradlew bootRun --args="--spring.datasource.url=jdbc:postgresql://localhost:5433/timetracker_test --spring.datasource.username=timetracker --spring.datasource.password=timetracker"',
+        `./gradlew bootRun --args="--spring.datasource.url=jdbc:postgresql://${DB_HOST}:${DB_PORT}/timetracker_test --spring.datasource.username=timetracker --spring.datasource.password=timetracker"`,
       cwd: '../backend',
       port: BACKEND_PORT,
       reuseExistingServer: !process.env.CI,

@@ -91,12 +91,18 @@ jobs:
     name: System (Playwright)
     runs-on: self-hosted
     needs: [backend, frontend]
-    # Runs directly on the runner host (Java/Node/Docker are all assumed present per the
-    # course's grading-environment spec) rather than in a container: containers started
-    # from *inside* a containerized job (whether via `docker compose` through the mounted
-    # host socket, or a `services:` container) are not reachable at localhost from inside
-    # that job's own container network namespace. On a host-based job, by contrast, a
-    # `services:` container's published port is just an ordinary host port.
+    # Runs in the official Playwright image, pinned to the exact @playwright/test version
+    # in e2e/package-lock.json (1.61.1), so the bundled Firefox build always matches what
+    # the tests were written/run against — no `playwright install` step needed, which is
+    # what previously required interactive root/sudo on the runner and broke CI. Running
+    # this job in a container also keeps ownership consistent with the backend/frontend
+    # containers above (all run as root), so no extra workspace-ownership fixup is needed.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
+    # A `services:` container is wired onto *this job's own* container network by GitHub
+    # Actions and is reachable at the service id as hostname (not `localhost` — that only
+    # works when the job itself runs directly on the runner host). See E2E_DB_HOST/PORT
+    # below and playwright.config.ts, which point the backend's datasource at db-test:5432.
     services:
       db-test:
         image: postgres:16-alpine
@@ -112,18 +118,15 @@ jobs:
           --health-timeout 3s
           --health-retries 10
 
-    steps:
-      # backend/frontend run in containers as root; when this job reuses the same shared
-      # runner workspace, actions/checkout's cleanup step can't remove the root-owned files
-      # they left behind. Hand ownership back with a throwaway container first.
-      - name: Fix workspace ownership left by prior containerized jobs
-        run: docker run --rm -v "${{ github.workspace }}:/workspace" alpine chown -R $(id -u):$(id -g) /workspace
+    env:
+      E2E_DB_HOST: db-test
+      E2E_DB_PORT: '5432'
 
+    steps:
       - uses: actions/checkout@v4
 
-      # The bare runner host only has git + Docker; Java/Node live in the per-job container
-      # images used by the backend/frontend jobs above, not on the host itself — don't
-      # assume either is present here.
+      # The Playwright image bundles Node.js but not a JDK, which the backend's
+      # `gradlew bootRun` webServer needs.
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -166,9 +169,9 @@ jobs:
         working-directory: e2e
         run: npm ci
 
-      - name: Install Playwright browsers
+      - name: Verify Playwright/browser versions match the pinned image
         working-directory: e2e
-        run: npx playwright install --with-deps firefox
+        run: npx playwright --version
 
       - name: Run Playwright system tests
         working-directory: e2e
