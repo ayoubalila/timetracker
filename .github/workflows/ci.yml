@@ -94,16 +94,21 @@ jobs:
     # Same container approach as the backend/frontend jobs above: this job previously ran
     # directly on the runner host, which — unlike the containerized jobs above, which run
     # as root — couldn't clean up root-owned files left in the shared workspace by them.
+    # Base on the backend job's JDK image (Ubuntu-based) and layer Node + Docker CLI on top,
+    # since a JDK isn't available via the minimal Debian-slim Node image's default apt sources.
     container:
-      image: node:24-bookworm-slim
+      image: eclipse-temurin:21-jdk-jammy
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install JDK and Docker CLI
+      - name: Install Node.js and the Docker CLI
         run: |
           apt-get update -qq
-          apt-get install -y --no-install-recommends openjdk-21-jdk-headless docker.io docker-compose-plugin
+          apt-get install -y --no-install-recommends ca-certificates curl gnupg
+          curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+          apt-get install -y --no-install-recommends nodejs
+          curl -fsSL https://get.docker.com | sh
           rm -rf /var/lib/apt/lists/*
 
       - name: Cache Gradle wrapper and caches
