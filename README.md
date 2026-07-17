@@ -52,17 +52,16 @@ docker compose down -v       # also remove database volume
 
 ## Running Tests
 
-Tests do **not** require Docker — they use H2 in-memory database.
+### Unit + integration tests
 
-### Backend tests
+These do **not** require Docker — they use an H2 in-memory database.
 
 ```bash
 cd backend
-./gradlew test                  # unit + integration tests (H2)
-./gradlew jacocoTestReport      # generates coverage report in build/reports/jacoco/
+./gradlew test                              # unit + integration tests (H2)
+./gradlew jacocoTestReport                  # generates coverage report in build/reports/jacoco/
+./gradlew jacocoTestCoverageVerification    # fails the build if line coverage < 90%
 ```
-
-### Frontend tests
 
 ```bash
 cd frontend
@@ -70,6 +69,27 @@ npm install
 npm run test                    # Vitest unit tests
 npm run coverage                # test + coverage report in coverage/
 ```
+
+### System / E2E tests (Playwright)
+
+These **do** require Docker — they run against a dedicated Postgres test database
+(`docker-compose.test.yml`), never against production data, plus a real running
+backend and frontend. Firefox is used to match the grading environment.
+
+```bash
+# 1. Start the dedicated test database
+docker compose -f docker-compose.test.yml up -d
+
+# 2. Install dependencies (first time only)
+cd frontend && npm install && cd ..
+cd e2e && npm install && npx playwright install firefox && cd ..
+
+# 3. Run the suite — Playwright boots the backend (Gradle) and frontend (Vite) for you
+cd e2e
+npm test
+```
+
+To stop the test database afterward: `docker compose -f docker-compose.test.yml down -v`
 
 ---
 
@@ -102,8 +122,9 @@ npm run dev      # dev server on http://localhost:5173 (proxies /api → :8080)
 
 GitHub Actions runs on every push and pull request:
 
-- **Backend**: ktlint → `./gradlew test` → Jacoco coverage (≥ 90%)
-- **Frontend**: ESLint → `npm run coverage` (≥ 90%)
+- **Backend**: ktlint → `./gradlew test` → Jacoco coverage (≥ 90%, gate enforced)
+- **Frontend**: ESLint → `npm run coverage` (≥ 90%, gate enforced)
+- **System**: Playwright E2E suite against a real backend + frontend + dedicated test database (runs after backend/frontend pass)
 
 ---
 
@@ -113,6 +134,7 @@ GitHub Actions runs on every push and pull request:
 /
 ├── backend/          # Spring Boot / Kotlin
 ├── frontend/         # React / TypeScript / Vite
+├── e2e/              # Playwright system/E2E tests
 ├── docker-compose.yml
 ├── docker-compose.test.yml
 ├── .env.example

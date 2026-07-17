@@ -31,7 +31,7 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 | 11 | ~~Secure all non-auth endpoints with JWT filter~~ ✅ #16 / PR #18 | feat | `OncePerRequestFilter`, 401 if token missing/invalid |
 | 12 | ~~Unit tests — AuthService (register, login, change password)~~ ✅ #17 / PR #18 | test | Mockito, covers happy path + error cases |
 | 13 | ~~Integration tests — AuthController~~ ✅ #17 / PR #18 | test | MockMvc + H2 |
-| 14 | E2E test — register → login → logout flow | test | Playwright |
+| 14 | ~~E2E test — register → login → logout flow~~ ✅ #79 | test | Playwright, `e2e/tests/auth.spec.ts` |
 
 ---
 
@@ -44,7 +44,7 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 | 17 | ~~[US] View project tree in the sidebar~~ ✅ #21 / PR #24 | feat | Recursive tree component in React |
 | 18 | ~~Unit tests — ProjectService~~ ✅ #22 / PR #24 | test | |
 | 19 | ~~Integration tests — ProjectController~~ ✅ #23 / PR #24 | test | |
-| 20 | E2E test — create project → add subproject → view tree | test | Playwright |
+| 20 | ~~E2E test — create project → add subproject → view tree~~ ✅ #79 | test | Playwright, `e2e/tests/projects.spec.ts` |
 
 ---
 
@@ -60,7 +60,7 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 | 26 | ~~[US] Delete a task~~ ✅ #32 / PR #35 | feat | |
 | 27 | ~~Unit tests — TaskService~~ ✅ #33 / PR #35 | test | |
 | 28 | ~~Integration tests — TaskController~~ ✅ #34 / PR #35 | test | |
-| 29 | E2E test — start task → stop task → edit task | test | Playwright |
+| 29 | ~~E2E test — start task → stop task → edit task~~ ✅ #79 | test | Playwright, `e2e/tests/tasks.spec.ts` |
 
 ---
 
@@ -76,7 +76,7 @@ Each task maps to one GitHub Issue. Issues use the user-story format where marke
 | 35 | Task overview — calendar-like view (week grid) | feat | Optional but strongly recommended per spec |
 | 36 | ~~Unit tests — OverviewService, time aggregation~~ ✅ #36 / PR #26db6b2 | test | Edge cases: running task, task in multiple subprojects |
 | 37 | ~~Integration tests — OverviewController, ProjectController#totalTime~~ ✅ #37 / PR #26db6b2 | test | |
-| 38 | E2E test — project total time updates after task add/stop | test | Playwright |
+| 38 | ~~E2E test — project total time updates after task add/stop~~ ✅ #79 | test | Playwright, `e2e/tests/overview.spec.ts` |
 
 ---
 
@@ -200,11 +200,11 @@ Custom features approved and detailed in **Milestone 9** below (issues 76–91).
 
 | # | Issue title | Type | Notes |
 |---|-------------|------|-------|
-| 87 | Flyway V9 — `hourly_rate` column on `project` | chore #71 | `DECIMAL(10,2)` nullable; null = inherit from nearest ancestor with a rate |
-| 88 | [US] Set an hourly rate on a project (subprojects inherit) | feat #72 | Rate field in project create/edit form; `ProjectResponse` includes `effectiveHourlyRate` (walks parent chain; null if none found) |
-| 89 | [US] View cost per task and total cost on project detail | feat #73 | Task rows show cost = duration × effective rate; project header shows total cost alongside total time |
-| 90 | Cost columns in CSV export | feat #74 | Add `hourly_rate` and `cost` columns to export (blank if no effective rate) |
-| 91 | Unit + integration tests — billable rates | test #75 | Cover rate inheritance chain walk, zero-duration edge case, null-rate export column |
+| 87 | ~~Flyway V9 — `hourly_rate` column on `project`~~ ✅ #71 | chore | `DECIMAL(10,2)` nullable; null = inherit from nearest ancestor with a rate |
+| 88 | ~~[US] Set an hourly rate on a project (subprojects inherit)~~ ✅ #72 | feat | Rate field in project create/edit form; `ProjectResponse` includes `effectiveHourlyRate` (walks parent chain; null if none found) |
+| 89 | ~~[US] View cost per task and total cost on project detail~~ ✅ #73 | feat | Task rows show cost = duration × effective rate; project header shows total cost alongside total time |
+| 90 | ~~Cost columns in CSV export~~ ✅ #74 | feat | Add `hourly_rate` and `cost` columns to export (blank if no effective rate) |
+| 91 | ~~Unit + integration tests — billable rates~~ ✅ #75 | test | Cover rate inheritance chain walk, zero-duration edge case, null-rate export column |
 
 ---
 
@@ -242,16 +242,16 @@ As a [role], I want [goal], so that [benefit].
 2. Milestone 1 (auth) — all features require authenticated users ✅
 3. Milestone 2 (projects) — tasks need projects to be associated with ✅
 4. Milestone 3 (time tracking) — core feature, most complex ✅
-5. Milestone 4 (overview) — depends on tracked data existing
-6. Milestone 5 (persistence verification) — confirm invariants
-7. Milestone 7A (project sharing) — Part II mandatory; new entity + security model
-8. Milestone 7B (shared task overview) — depends on sharing
-9. Milestone 7C (export) — depends on shared project task data; M9C adds cost columns here
-10. Milestone 7D (time zones) — depends on user settings infrastructure
-11. Milestone 9A (task tags) — Master's custom; add tag filter + export column after M7C exists
-12. Milestone 9B (time budgets) — Master's custom; reuses M4 aggregation
-13. Milestone 9C (billable rates) — Master's custom; adds cost columns on top of M7C export
-14. Milestone 6 (polish + coverage) — quality gate; do last before submission
+5. Milestone 4 (overview) — depends on tracked data existing ✅
+6. Milestone 5 (persistence verification) — confirm invariants ✅
+7. Milestone 7A (project sharing) — Part II mandatory; new entity + security model ✅
+8. Milestone 7B (shared task overview) — depends on sharing ✅
+9. Milestone 7C (export) — depends on shared project task data; M9C adds cost columns here ✅
+10. Milestone 7D (time zones) — depends on user settings infrastructure ✅
+11. Milestone 9A (task tags) — Master's custom; add tag filter + export column after M7C exists ✅
+12. Milestone 9B (time budgets) — Master's custom; reuses M4 aggregation ✅
+13. Milestone 9C (billable rates) — Master's custom; adds cost columns on top of M7C export ✅
+14. Milestone 6 (polish + coverage) — quality gate; do last before submission ✅
 15. Milestone 8 (submission) — always last
 
 ## Remaining timeline (today: 2026-07-01 | deadline: 2026-07-19)
