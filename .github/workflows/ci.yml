@@ -91,9 +91,20 @@ jobs:
     name: System (Playwright)
     runs-on: self-hosted
     needs: [backend, frontend]
+    # Same container approach as the backend/frontend jobs above: this job previously ran
+    # directly on the runner host, which — unlike the containerized jobs above, which run
+    # as root — couldn't clean up root-owned files left in the shared workspace by them.
+    container:
+      image: node:24-bookworm-slim
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install JDK and Docker CLI
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends openjdk-21-jdk-headless docker.io docker-compose-plugin
+          rm -rf /var/lib/apt/lists/*
 
       - name: Cache Gradle wrapper and caches
         uses: actions/cache@v4
