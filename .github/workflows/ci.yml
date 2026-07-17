@@ -94,21 +94,38 @@ jobs:
     # Same container approach as the backend/frontend jobs above: this job previously ran
     # directly on the runner host, which — unlike the containerized jobs above, which run
     # as root — couldn't clean up root-owned files left in the shared workspace by them.
-    # Base on the backend job's JDK image (Ubuntu-based) and layer Node + Docker CLI on top,
-    # since a JDK isn't available via the minimal Debian-slim Node image's default apt sources.
+    # Base on the backend job's JDK image (Ubuntu-based) and layer Node on top, since a JDK
+    # isn't available via the minimal Debian-slim Node image's default apt sources.
     container:
       image: eclipse-temurin:21-jdk-jammy
+    # A GitHub Actions service container (rather than `docker compose` run from inside the
+    # job) so it lands on the job container's own network and is reachable at localhost —
+    # containers started via the auto-mounted host Docker socket would be host-network
+    # siblings instead, invisible from inside this container's network namespace.
+    services:
+      db-test:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: timetracker_test
+          POSTGRES_USER: timetracker
+          POSTGRES_PASSWORD: timetracker
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U timetracker"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Node.js and the Docker CLI
+      - name: Install Node.js
         run: |
           apt-get update -qq
           apt-get install -y --no-install-recommends ca-certificates curl gnupg
           curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
           apt-get install -y --no-install-recommends nodejs
-          curl -fsSL https://get.docker.com | sh
           rm -rf /var/lib/apt/lists/*
 
       - name: Cache Gradle wrapper and caches
@@ -144,9 +161,6 @@ jobs:
         working-directory: e2e
         run: npx playwright install --with-deps firefox
 
-      - name: Start dedicated test database
-        run: docker compose -f docker-compose.test.yml up -d --wait
-
       - name: Run Playwright system tests
         working-directory: e2e
         run: npm test
@@ -159,7 +173,3 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report/
           retention-days: 3
-
-      - name: Stop test database
-        if: always()
-        run: docker compose -f docker-compose.test.yml down -v
