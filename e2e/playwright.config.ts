@@ -39,7 +39,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        `./gradlew bootRun --args="--spring.datasource.url=jdbc:postgresql://${DB_HOST}:${DB_PORT}/timetracker_test --spring.datasource.username=timetracker --spring.datasource.password=timetracker"`,
+  `${process.platform === 'win32' ? '.\\gradlew.bat' : './gradlew'} bootRun --args="--spring.datasource.url=jdbc:postgresql://${DB_HOST}:${DB_PORT}/timetracker_test --spring.datasource.username=timetracker --spring.datasource.password=timetracker"`,
       cwd: '../backend',
       port: BACKEND_PORT,
       reuseExistingServer: !process.env.CI,
