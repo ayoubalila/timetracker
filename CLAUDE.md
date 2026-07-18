@@ -2,18 +2,10 @@
 
 ## What is this project?
 
-A full-stack time-tracking web application for individuals and teams (students, freelancers, researchers). Users register, log in, and track time spent on hierarchical projects. Tasks can be started/stopped in real time or added/edited manually. The app provides day/week/month overviews and aggregates time across project hierarchies. Projects can be shared between users, with task export and timezone support added in Part II. See `docs/final-project-part-1.md` and `docs/final-project-part-2.md` for the full requirements specs.
+A full-stack time-tracking web application for individuals and teams (students, freelancers, researchers). Users register, log in, and track time spent on hierarchical projects. Tasks can be started/stopped in real time or added/edited manually. The app provides day/week/month overviews and aggregates time across project hierarchies. Projects can be shared between users, with task export and timezone support added in Part II.
 
 ## Reference documents
 
-- `docs/final-project-part-1.md` — Part I requirements
-- `docs/final-project-part-2.md` — Part II requirements (project sharing, export, timezones, custom features)
-- `lectures/02-requirements.md` — user story and acceptance-criteria format
-- `lectures/03-prototyping.md` — architecture patterns (MVC, REST, repository)
-- `lectures/04-coding.md` — coding workflow: plan → generate → verify → refine
-- `lectures/05-testing.md` — test hierarchy, coverage targets, mutation testing
-- `lectures/06-development-processes.md` — CI, linting, code review process
-- `lectures/07-system-testing.md` — Playwright E2E testing setup
 - `PLANNING.md` — architecture, domain model, UI screens
 - `TASKS.md` — milestones and task breakdown
 
