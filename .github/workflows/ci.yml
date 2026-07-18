@@ -121,6 +121,16 @@ jobs:
     env:
       E2E_DB_HOST: db-test
       E2E_DB_PORT: '5432'
+      # GitHub Actions bind-mounts /github/home into every containerized job on this
+      # self-hosted runner and forces HOME=/github/home, regardless of the image's
+      # default user. That directory is owned by a uid the playwright image's
+      # /etc/passwd resolves to "pwuser", but this job's container runs as root, so
+      # Firefox's namespace sandbox refuses to launch ("$HOME is /github/home which
+      # is owned by pwuser"). Firefox's own error message documents the fix: point
+      # HOME at a directory root actually owns. Set job-wide (not just on `npm test`)
+      # so the earlier Gradle/npm cache steps and the gradlew bootRun / vite dev
+      # webServer children that `npm test` spawns all agree on the same HOME.
+      HOME: /root
 
     steps:
       - uses: actions/checkout@v4
