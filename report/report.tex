@@ -1,0 +1,191 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage[colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!50!black, citecolor=blue!50!black]{hyperref}
+
+\setlist[itemize]{topsep=2pt, itemsep=2pt, parsep=0pt}
+\setlist[enumerate]{topsep=2pt, itemsep=2pt, parsep=0pt}
+
+
+\newcommand{\repourl}{https://github.com/se2p-classrooms/final-project-ayoubalila}
+\newcommand{\ghissue}[1]{\href{\repourl/issues/#1}{Issue~\##1}}
+\newcommand{\ghpr}[1]{\href{\repourl/pull/#1}{PR~\##1}}
+\newcommand{\ghcommit}[1]{\href{\repourl/commit/#1}{\texttt{#1}}}
+
+\begin{document}
+
+
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+
+    {\LARGE\bfseries Project: TimeTracker \\[0.4cm]
+    An AI-Driven Full-Stack Software Development Project\par}
+
+    \vspace{1.5cm}
+
+    {\large\bfseries Domain: \itshape AI-Driven Software Engineering -- Full-Stack Web Development (Kotlin/Spring Boot \& React/TypeScript) and Agentic Coding Tools\par}
+
+    \vspace{2cm}
+
+    \begin{flushleft}
+        {\large \textit{Work carried out by:} \textbf{Ayoub Alila}}\\[0.3cm]
+        {\large \textit{GitHub:} \href{https://github.com/ayoubalila}{\textbf{ayoubalila}} \quad \textit{Matriculation No.:} \textbf{118766}}\\[0.3cm]
+        {\large \textit{Repository:} \url{\repourl}}
+    \end{flushleft}
+
+    \vfill
+
+\includegraphics[width=0.45\textwidth]{Uni_Passau-Logo.png}
+
+    \vfill
+
+    {\large\bfseries Academic year: summer semester 2026\par}
+
+    \vspace*{1cm}
+\end{titlepage}
+
+
+\section*{Note on the Use of Artificial Intelligence}
+\addcontentsline{toc}{section}{Note on the Use of Artificial Intelligence}
+
+In the context of this project, AI tools were used deliberately and transparently, in line with the AI-driven nature of the assignment itself. The agentic coding tool \textbf{Claude Code} (Anthropic) was used from the terminal and through its VS Code integration for repository exploration, planning support, full-stack implementation, test writing, CI configuration and debugging, and documentation. \textbf{Perplexity} was used as a conversational support tool outside the repository, to clarify assignment requirements, interpret project status and CI results, and prepare focused, repository-aware prompts.
+
+All AI-generated code and documentation changes were reviewed by me before being accepted, and were validated through unit, integration, frontend, mutation, and system tests together with the GitHub Actions pipeline. AI tools served as an implementation and reasoning accelerator, not as an autonomous replacement for engineering judgement. AI assistance was also used punctually to improve the wording and readability of parts of this report; the analysis, reflections, and conclusions are my own.
+
+\newpage
+
+\tableofcontents
+\newpage
+
+
+\section{Introduction}
+
+The rapid maturation of large language models (LLMs) and agentic coding tools is transforming how software is designed, implemented, and verified. Rather than acting only as autocomplete assistants, modern tools such as Claude Code can read an entire repository, plan multi-step changes, write and run tests, and iterate on CI failures. This shift raises a central engineering question: how should a developer structure their workflow so that AI acceleration does not come at the cost of architectural coherence, correctness, or maintainability?
+
+This report addresses that question through the development of \textbf{TimeTracker}, a full-stack time-tracking application built as part of an AI-driven software development lab. TimeTracker consists of a React/TypeScript single-page frontend, a Kotlin/Spring Boot REST backend, a PostgreSQL database with Flyway-managed migrations, and JWT-based authentication, all integrated and verified through a comprehensive automated test suite and a GitHub Actions CI pipeline.
+
+The report reflects on my individual contribution to the project and on my use of AI-based tools throughout the development process. It follows the structure recommended in the assignment specification, preceded by an account of my own role and methodology, and followed by a dedicated section on the three custom features, a discussion, and a conclusion with perspectives for future work.
+
+\section{My Role and Development Methodology}
+
+My contribution was to drive the architecture, define and prioritise the milestones, choose the technology stack, formulate repository-aware prompts, review AI-generated output, validate changes through tests and CI, and integrate all work into one coherent application. AI tools were an implementation and reasoning accelerator, not an autonomous replacement for engineering judgement.
+
+The workflow I followed was consistently iterative:
+
+\begin{enumerate}
+    \item I translated the assignment into a milestone-based plan (\texttt{PLANNING.md}, \texttt{TASKS.md}) with issues, acceptance criteria, and dependencies between milestones.
+    \item For each feature, I asked Claude Code to first read the relevant repository documentation and the current implementation before writing anything, so that generated code matched the existing architecture rather than an assumed one.
+    \item I gave focused tasks scoped to one issue or milestone at a time, rather than requesting the whole system in one prompt.
+    \item I reviewed the resulting code and documentation changes myself before accepting them.
+    \item I verified results with unit, integration, frontend, mutation, and system tests, together with the GitHub Actions pipeline, rather than trusting that generated code compiled or behaved as intended.
+    \item When failures occurred, I used the exact test output or CI logs to narrow the next prompt and to request a minimal, evidence-based fix instead of a broad rewrite.
+\end{enumerate}
+
+This structured use of AI, decomposing work, constraining scope, and closing the loop with automated verification, was itself one of the main learning outcomes of the lab, arguably as significant as any individual feature implemented.
+
+\newpage
+\section{System Architecture and Design Decisions}
+
+TimeTracker is a full-stack time-tracking application: a React/TypeScript single-page frontend talking to a Kotlin/Spring Boot REST backend backed by PostgreSQL, with JWT-based authentication and Flyway-managed schema migrations. The backend follows a conventional layered structure (controller~$\to$~service~$\to$~repository), with DTOs kept separate from JPA entities so entities are never exposed directly over REST.
+
+\paragraph{Frontend.} React, TypeScript, and Vite were chosen for a typed, component-based frontend with a mature ecosystem and fast local iteration (HMR), which mattered given the compressed timeline. I considered alternatives such as Vue or Angular in principle, but did not build prototypes or run a formal comparison, the decision was driven by React's fit for the interactive, stateful UI (live timer, nested project trees, modals) and by the availability of mature documentation, established libraries, and a broad ecosystem. shadcn/ui and Tailwind CSS were used for accessible, unstyled-by-default components without a heavy runtime, which kept the UI consistent as it grew.
+
+\paragraph{Backend.} The JVM is mandated by the assignment, which fixed the language family; Kotlin was chosen over plain Java for its data classes and null-safety, which reduce boilerplate in DTOs and entities. Spring Boot was chosen for its mature, well-documented REST, validation, security, and JPA integration, all of which are also well represented in LLM training data.
+
+\paragraph{Persistence.} PostgreSQL was chosen for the relational domain, users, hierarchical projects, project memberships, tasks, tags, budgets, and rates, and specifically for its support of recursive common table expressions, which are used to aggregate tracked time across a project and all of its descendants exactly once. H2 is used only for fast in-memory unit/integration tests so the required test suite does not depend on Docker. Flyway provides versioned, reproducible migrations (V1--V9, one per schema change, see \texttt{PLANNING.md}); Spring Data JPA handles ordinary CRUD access, while the hierarchical aggregation query is implemented as raw SQL because it is not naturally expressible through the repository abstraction.
+
+\paragraph{Authentication.} I chose stateless JWTs over server-side sessions because the frontend and backend are deployed as separate processes and token-based authentication keeps the API simple for the assignment scope. Persistence of a running task across browser restarts is handled by storing the task start time in the database, while the frontend recalculates the elapsed time after login. I weighed this against session-based authentication in principle but did not prototype it, since JWTs were the more natural fit for the chosen client/server split.
+
+\paragraph{CI/CD evolution.} \texttt{PLANNING.md}~\S7 originally sketched a straightforward three-job pipeline (backend, frontend, system tests) running commands directly on the runner. Building out the System (Playwright) job showed that end-to-end tests needed a properly isolated PostgreSQL instance, a matching JDK/Node toolchain, and a browser build that all agreed with one another, none of which the simple sketch accounted for. The project moved to a self-hosted runner with every job (backend, frontend, system) running inside a pinned container image (\ghissue{25}, \ghpr{26}); the System job specifically combines a GitHub Actions PostgreSQL service container with host-installed JDK/Node tooling and the official Playwright browser image. Reaching that configuration took more iterations than expected, discussed in \S\ref{sec:worked-well} and \S\ref{sec:not-intended}.
+
+\section{Used LLMs and AI-Based Tools}
+
+The main implementation tool was \textbf{Claude Code}, an agentic coding CLI used from the terminal (and its VS Code integration) for repository exploration, planning support, full-stack implementation, writing tests, CI configuration and debugging, documentation, and iterative UI verification via ad-hoc screenshot scripts. I do not name a specific underlying model version, since the session-to-session model was not something I tracked or can reliably reconstruct.
+
+I also used \textbf{Perplexity} as a conversational support tool outside the repository: to understand and clarify assignment requirements, to interpret project status and CI results at a higher level, to plan the next milestone, and to prepare focused, repository-aware prompts before handing a task to Claude Code.
+
+\texttt{PLANNING.md}, \texttt{TASKS.md}, and \texttt{CLAUDE.md} were maintained iteratively with AI assistance and my own review throughout the project, rather than written once at the start. These files acted as persistent, repository-resident instructions for the agent: they encode the architecture, coding conventions, security constraints (e.g.\ the project-membership access rule), feature dependencies between milestones, and testing expectations, so that each new prompt did not have to restate this context from scratch. Configuring the agent this way, through durable project files rather than one-off chat messages, was as important to the workflow as any individual prompt.
+
+\section{Where AI Tools Worked Well}
+\label{sec:worked-well}
+
+\paragraph{Incremental full-stack delivery.} Claude Code was most effective when the project was decomposed into small, clearly scoped milestones with acceptance criteria already written down. Within that structure, it accelerated consistent implementation across Kotlin/Spring Boot services, DTOs, validation, and REST endpoints, together with the matching React components, API integration, and tests, for example the project-sharing milestone (\ghissue{41}--\ghissue{46}) and the billable-rates feature (\ghissue{71}--\ghissue{75}, \ghpr{76}). I retained control by reviewing each change against the existing architecture and by requiring the accompanying unit and integration tests to pass before moving on.
+
+\paragraph{Quality assurance and test hardening.} AI assistance was useful for locating untested branches and proposing targeted tests to close coverage gaps once both the backend (Jacoco) and frontend (Vitest) gates were set to a 90\% line/branch/function/statement threshold, and for the Pitest mutation-testing baseline on the service layer (\ghissue{39}, \ghissue{40}). It worked best when I gave it a concrete coverage report or a specific failing/surviving case, rather than a vague instruction to ``improve testing.''
+
+\paragraph{Final Playwright CI diagnosis.} The resolution of the System (Playwright) CI failure illustrates AI working well once given the right constraints. After I supplied the exact CI error text, restricted the task explicitly to the failing job, and required inspection of the actual workflow file before any edit, Claude Code correctly identified that the Playwright container ran as root while GitHub Actions forced \texttt{HOME=/github/home} (owned by a different user inside that image), which is exactly the condition under which Firefox's sandbox refuses to launch. It proposed the minimal, job-scoped \texttt{HOME=/root} fix documented in Firefox's own error output (\ghcommit{f616cb8}), reasoning explicitly about why the fix had to be job-scoped rather than step-scoped to avoid invalidating the Gradle/npm caches used by the same job. The System job subsequently passed.
+
+\newpage
+\section{Where AI Tools Did Not Work as Intended}
+\label{sec:not-intended}
+
+The same CI story is also the clearest example of AI underperforming. Stabilising the System (Playwright) job took a chain of separate fix commits (\ghcommit{748979c}, \ghcommit{2487617}, \ghcommit{caa9ec4}, \ghcommit{774cff6}, \ghcommit{58c2f67}, \ghcommit{d2ecb98}, \ghcommit{f616cb8}) introduced after the E2E suite itself (\ghissue{79}, \ghpr{80}). Early fixes were too local: each addressed the symptom visible in the last failed run, missing Docker CLI, service-container networking, native-runner Postgres access, missing JDK/Node setup, a browser version mismatch, without accounting for how the self-hosted runner, Docker, PostgreSQL, Node tooling, Playwright's bundled browsers, container permissions, and Firefox's own sandboxing all interacted. A plausible, locally-correct patch was repeatedly not a complete fix for the environment as a whole.
+
+I recognised this pattern through the next CI run: each ``fixed'' commit reliably exposed a different, previously hidden assumption rather than a full resolution. In response, I adapted from broad prompts such as ``fix CI'' to evidence-rich requests that included the exact failing log, named the single job to change, explicitly asked for root-cause reasoning before any edit, and required the smallest change that would not regress the backend or frontend jobs, which were already green. That shift in prompting is what ultimately produced the correct, minimal, job-scoped diagnosis described in \S\ref{sec:worked-well}. The broader lesson was that AI is most reliable when grounded in the actual repository state and concrete execution evidence; it can meaningfully accelerate diagnosis, but it does not remove the need for engineering judgement, verification against real logs, and iterative debugging.
+
+\section{Missing AI Tools}
+
+A tool I would have found valuable but did not have access to is one that can inspect and reproduce the \emph{actual} CI runtime environment, container image, user/UID, filesystem permissions, mounted directories, installed dependencies, service containers, browser runtime configuration, and environment variables, and then test a proposed workflow fix inside an equivalent sandbox before it is pushed to the real pipeline. During the Playwright/Firefox debugging described in \S\ref{sec:not-intended}, every hypothesis had to be validated by pushing a commit and waiting for a full CI run; a local or sandboxed replica of the self-hosted runner's container setup would have shortened that trial-and-error loop considerably.
+
+\section{Custom Features and Design Rationale}
+
+Beyond the mandatory Part~I/II requirements, three custom features were designed and implemented, each extending the base time-tracking model rather than sitting alongside it as an unrelated addition.
+
+\subsection{Task Tags with Cross-Cutting Filters}
+Project hierarchy alone cannot represent every way a user wants to categorise work: a task can belong to one project, but a tag can cut across projects (e.g.\ ``urgent'', ``billable-review''). Tags let a user classify tasks independently of the project tree and filter the dashboard, project task views, and CSV exports by tag. A deliberate design choice was to scope tags per user rather than per project: tags are personal organisation, so on a shared project a collaborator's own tags are never exposed to or reused by other members, keeping the sharing model (project data shared, personal categorisation private) consistent.
+\\[2pt]
+\textit{Migration:} \ghissue{58}. \textit{Feature issues:} \ghissue{59}, \ghissue{60}, \ghissue{61}, \ghissue{62}. \textit{Tests:} \ghissue{63}. \textit{Implementation:} \ghpr{64}.
+
+\subsection{Project Time Budgets with Progress Alerts}
+Budgets turn time tracking from a purely retrospective log into a planning aid. Supporting total, weekly, and monthly budget periods covers both fixed-scope work (a total budget for a project) and recurring work patterns (a weekly or monthly allowance). Rather than only reporting a historical percentage on a dashboard, the threshold warning (yellow at $\geq 80\%$, red at $\geq 100\%$) is deliberately surfaced right after a task is stopped, i.e.\ at the moment a user's own action changes the budget usage, so the feedback is actionable rather than something discovered later while browsing a report. For shared projects, budget usage is computed over all members' combined time, consistent with how shared-project totals are already computed elsewhere in the application.
+\\[2pt]
+\textit{Migration:} \ghissue{65}. \textit{Feature issues:} \ghissue{66}, \ghissue{67}, \ghissue{68}. \textit{Tests:} \ghissue{69}. \textit{Implementation:} \ghpr{70}.
+
+\subsection{Billable Rates and Cost Reporting}
+Billable rates extend the application from time recording into cost reporting, which is directly useful for the freelancer/researcher personas the application targets. An hourly rate can be set on any project; if a (sub-)project has no rate of its own, it inherits the nearest ancestor's rate by walking up the project tree, which avoids having to configure a rate on every subproject individually while still allowing an explicit override lower in the hierarchy. The resolved (``effective'') rate and the resulting cost are surfaced at task level, at project level, and as additional columns in the CSV export, so the same cost figures are available both inside the UI and in external spreadsheets.
+\\[2pt]
+\textit{Migration:} \ghissue{71}. \textit{Feature issues:} \ghissue{72}, \ghissue{73}, \ghissue{74}. \textit{Tests:} \ghissue{75}. \textit{Implementation:} \ghpr{76}.
+
+\newpage
+\section{Discussion}
+
+Taken together, the experiences documented in this report converge on one central observation: the value of AI-driven development depends far less on the raw capability of the model than on the \emph{engineering discipline wrapped around it}.
+
+Where the workflow was structured, milestones with written acceptance criteria, repository-resident context files (\texttt{PLANNING.md}, \texttt{TASKS.md}, \texttt{CLAUDE.md}), one issue per prompt, and mandatory verification through tests and CI, Claude Code delivered consistent, architecture-conforming code across the full stack at a pace I could not have matched alone. Where the structure was weakest, most visibly in the early CI debugging phase, the same tool produced a chain of plausible but locally-scoped patches, each of which resolved one visible symptom while missing the interaction between the runner, containers, tooling, and browser sandboxing.
+
+Three broader points follow from this contrast. First, AI tools amplify the quality of their input: precise, evidence-rich prompts grounded in real logs and repository state yielded root-cause fixes, while broad prompts such as ``fix CI'' yielded symptom-chasing. Second, automated verification is not optional in an AI-driven workflow, it is the mechanism that converts fast-but-fallible generation into trustworthy progress; the 90\% coverage gates, mutation testing, and the three-job CI pipeline repeatedly caught issues that a review of the diff alone would have missed. Third, the human role shifts rather than shrinks: less time is spent typing boilerplate, and more is spent on architecture, scoping, review, and the interpretation of failures, activities that remain firmly a matter of engineering judgement.
+
+These findings also have limits. They are drawn from a single project, a single primary agentic tool, and a compressed timeline; a different domain (e.g.\ one less represented in LLM training data than Spring Boot and React) or a longer-lived codebase might shift the balance between acceleration and rework. Nevertheless, within the scope of this lab, the disciplined human-in-the-loop workflow proved to be the decisive factor in making AI assistance a net gain.
+
+\newpage
+\section{Conclusion and Perspectives}
+
+This project delivered TimeTracker, a complete full-stack time-tracking application with hierarchical projects, sharing, tags, budgets, billable rates, JWT authentication, versioned database migrations, and a rigorously tested codebase enforced by a containerised CI pipeline. Just as importantly, it served as a controlled experiment in AI-driven software development: the entire implementation was carried out with an agentic coding tool operating under explicit human direction, review, and automated verification.
+
+The main conclusion is methodological. AI tools were most effective when work was decomposed into small, well-specified units, when the agent was grounded in durable repository context rather than ad-hoc chat instructions, and when every change had to pass through tests and CI before acceptance. Conversely, the CI stabilisation episode showed that AI does not replace systems-level reasoning: understanding how a self-hosted runner, containers, service networking, and browser sandboxing interact required human diagnosis strategy, with the AI acting as an accelerator once the problem was properly framed.
+
+Several perspectives follow for future work. On the product side, natural extensions include reporting dashboards with charts, calendar integrations, idle-time detection, and multi-currency support for billable rates. On the methodology side, it would be valuable to formalise the prompting patterns that emerged here, evidence-first debugging requests, scope-restricted tasks, and root-cause-before-edit constraints, into reusable agent instructions, and to evaluate them across multiple projects. Finally, the ``missing tool'' identified in this report, a sandboxed replica of the CI runtime in which proposed workflow fixes can be validated before pushing, points to a concrete direction in which agentic development environments could evolve, closing the last slow feedback loop that this project encountered.
+
+\newpage
+\section{References}
+
+\begin{enumerate}
+    \item Anthropic. (2025). \textit{Claude Code: Agentic coding in your terminal} -- Documentation. \url{https://docs.anthropic.com/en/docs/claude-code}
+    \item Spring Team. (2025). \textit{Spring Boot Reference Documentation}. \url{https://docs.spring.io/spring-boot/}
+    \item JetBrains. (2025). \textit{Kotlin Language Documentation}. \url{https://kotlinlang.org/docs/}
+    \item Meta Open Source. (2025). \textit{React Documentation}. \url{https://react.dev/}
+    \item Microsoft. (2025). \textit{Playwright: Fast and reliable end-to-end testing for modern web apps}. \url{https://playwright.dev/}
+    \item PostgreSQL Global Development Group. (2025). \textit{PostgreSQL Documentation: WITH Queries (Common Table Expressions)}. \url{https://www.postgresql.org/docs/current/queries-with.html}
+    \item Redgate Software. (2025). \textit{Flyway Documentation: Database migrations made easy}. \url{https://documentation.red-gate.com/flyway}
+    \item GitHub. (2025). \textit{GitHub Actions Documentation}. \url{https://docs.github.com/en/actions}
+    \item Coles, H. (2025). \textit{Pitest: Real world mutation testing for the JVM}. \url{https://pitest.org/}
+    \item Project repository: \textit{TimeTracker -- final-project-ayoubalila}. \url{\repourl}
+\end{enumerate}
+
+\end{document}
